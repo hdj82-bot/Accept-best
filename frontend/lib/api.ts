@@ -6,7 +6,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // Domain types (mirrors FastAPI Pydantic schemas)
 // ────────────────────────────────────────────────────────────────────────────
 
-export type Plan = "free" | "basic" | "pro";
+export type Plan = "free" | "basic" | "pro" | "admin";
 
 export interface User {
   id: string;
@@ -34,6 +34,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free:  { research: 3,  survey: 3,  summary: 10 },
   basic: { research: 20, survey: 20, summary: 100 },
   pro:   { research: -1, survey: -1, summary: -1 },  // -1 = unlimited
+  admin: { research: -1, survey: -1, summary: -1 },
 };
 
 export interface Paper {
@@ -135,17 +136,28 @@ export async function getUsage(token?: string): Promise<MonthlyUsage> {
   return res.json();
 }
 
+export interface SearchFilters {
+  year_from?: number;
+  year_to?: number;
+  source?: "all" | "arxiv" | "semantic_scholar";
+}
+
 /**
  * POST /papers/search
  * Returns papers sorted by similarity score descending.
  */
 export async function searchPapers(
   query: string,
+  filters?: SearchFilters,
   token?: string,
 ): Promise<Paper[]> {
+  const body: Record<string, unknown> = { query };
+  if (filters?.year_from) body.year_from = filters.year_from;
+  if (filters?.year_to)   body.year_to   = filters.year_to;
+  if (filters?.source && filters.source !== "all") body.source = filters.source;
   const res = await fetchWithAuth(
     "/papers/search",
-    { method: "POST", body: JSON.stringify({ query }) },
+    { method: "POST", body: JSON.stringify(body) },
     token,
   );
   return res.json();
@@ -332,4 +344,133 @@ export async function deleteSurvey(
   token?: string,
 ): Promise<void> {
   await fetchWithAuth(`/survey/${id}`, { method: "DELETE" }, token);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Billing
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface BillingPlan {
+  id: Plan;
+  name: string;
+  price_monthly: number;    // KRW, 0 = free
+  features: string[];
+}
+
+export interface CurrentBilling {
+  plan: Plan;
+  expires_at: string | null;
+  auto_renew: boolean;
+}
+
+export interface UpgradePlanResponse {
+  success: boolean;
+  message: string;
+  expires_at: string;
+}
+
+/** GET /billing/plans */
+export async function getPlans(token?: string): Promise<BillingPlan[]> {
+  const res = await fetchWithAuth("/billing/plans", {}, token);
+  return res.json();
+}
+
+/** GET /billing/current */
+export async function getCurrentBilling(token?: string): Promise<CurrentBilling> {
+  const res = await fetchWithAuth("/billing/current", {}, token);
+  return res.json();
+}
+
+/** POST /billing/upgrade */
+export async function upgradePlan(
+  plan: Plan,
+  months: number,
+  token?: string,
+): Promise<UpgradePlanResponse> {
+  const res = await fetchWithAuth(
+    "/billing/upgrade",
+    { method: "POST", body: JSON.stringify({ plan, months }) },
+    token,
+  );
+  return res.json();
+}
+
+/** POST /billing/cancel */
+export async function cancelPlan(token?: string): Promise<void> {
+  await fetchWithAuth("/billing/cancel", { method: "POST" }, token);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Export
+// ────────────────────────────────────────────────────────────────────────────
+
+export type ExportFormat = "markdown" | "pdf";
+export type ExportTaskStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILURE";
+
+export interface ExportTaskResponse {
+  task_id: string;
+}
+
+export interface ExportStatusResponse {
+  status: ExportTaskStatus;
+  download_url?: string;
+  error?: string;
+}
+
+/** POST /export/{format}/{noteId} → { task_id } */
+export async function exportNote(
+  format: ExportFormat,
+  noteId: string,
+  token?: string,
+): Promise<ExportTaskResponse> {
+  const res = await fetchWithAuth(
+    `/export/${format}/${encodeURIComponent(noteId)}`,
+    { method: "POST" },
+    token,
+  );
+  return res.json();
+}
+
+/** GET /export/status/{taskId} */
+export async function getExportStatus(
+  taskId: string,
+  token?: string,
+): Promise<ExportStatusResponse> {
+  const res = await fetchWithAuth(`/export/status/${encodeURIComponent(taskId)}`, {}, token);
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Admin
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface AdminStats {
+  total_users: number;
+  plan_distribution: Record<string, number>;
+  daily_usage: Array<{ date: string; count: number }>;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  plan: Plan;
+  monthly_usage: MonthlyUsage;
+  created_at: string;
+}
+
+/** GET /admin/stats */
+export async function getAdminStats(token?: string): Promise<AdminStats> {
+  const res = await fetchWithAuth("/admin/stats", {}, token);
+  return res.json();
+}
+
+/** GET /admin/users */
+export async function getAdminUsers(token?: string): Promise<AdminUser[]> {
+  const res = await fetchWithAuth("/admin/users", {}, token);
+  return res.json();
+}
+
+/** DELETE /admin/users/:id */
+export async function deleteAdminUser(id: string, token?: string): Promise<void> {
+  await fetchWithAuth(`/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
 }

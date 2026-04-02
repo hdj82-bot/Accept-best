@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-academi}
+      POSTGRES_USER: ${POSTGRES_USER:-academi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-academi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ${DOCKERHUB_USERNAME}/academi-backend:latest
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  celery-collect:
+    image: ${DOCKERHUB_USERNAME}/academi-backend:latest
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks worker -Q collect --concurrency 2 --loglevel=info
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  celery-process:
+    image: ${DOCKERHUB_USERNAME}/academi-backend:latest
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks worker -Q process --concurrency 4 --loglevel=info
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/academi-frontend:latest
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+
+volumes:
+  pg_data:

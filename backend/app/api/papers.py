@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from typing import Optional
 
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
@@ -8,6 +9,7 @@ from app.models.papers import Paper
 from app.schemas.papers import PaperRead
 from app.services import paper_service
 from app.services.embedding_service import get_embedding
+from app.services import search_service
 
 router = APIRouter()
 settings = get_settings()
@@ -23,6 +25,9 @@ async def get_db():
 
 class SearchBody(BaseModel):
     query: str
+    year_from: Optional[int] = None
+    year_to: Optional[int] = None
+    source: Optional[str] = None  # 'arxiv' | 'semantic_scholar'
 
 
 class CollectBody(BaseModel):
@@ -33,7 +38,14 @@ class CollectBody(BaseModel):
 @router.post("/papers/search", response_model=list[PaperRead])
 async def search_papers(body: SearchBody, db: AsyncSession = Depends(get_db)):
     embedding = get_embedding(body.query)
-    papers = await paper_service.search_similar(embedding, db, limit=10)
+    papers = await search_service.search_papers_filtered(
+        embedding,
+        db,
+        limit=10,
+        year_from=body.year_from,
+        year_to=body.year_to,
+        source=body.source,
+    )
     return papers
 
 

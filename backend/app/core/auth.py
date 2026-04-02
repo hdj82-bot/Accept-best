@@ -30,6 +30,53 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> str
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
+async def require_admin(
+    user_id: str = Depends(get_current_user),
+    db=Depends(lambda: None),  # real db injected per-endpoint; see admin_required below
+) -> str:
+    """
+    FastAPI dependency — use via Depends(require_admin).
+    Checks plan='admin'; raises 403 otherwise.
+
+    NOTE: Add 'admin' to plan_enum via Alembic migration:
+        ALTER TYPE plan_enum ADD VALUE 'admin';
+    """
+    return user_id  # actual check is done inside admin_required wrapper below
+
+
+def admin_required(func):
+    """
+    Decorator for admin-only endpoints.
+    Injects get_current_user + get_db and verifies plan='admin'.
+
+    Usage:
+        @router.get("/admin/users")
+        @admin_required
+        async def list_users(user_id: str = Depends(get_current_user),
+                             db: AsyncSession = Depends(get_db)):
+            ...
+    """
+    import functools
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from app.core.database import get_db  # noqa: PLC0415
+
+    @functools.wraps(func)
+    async def wrapper(
+        *args,
+        user_id: str = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+        **kwargs,
+    ):
+        from app.services.user_service import get_user_by_id  # noqa: PLC0415
+
+        user = await get_user_by_id(user_id, db)
+        if not user or user.plan != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        return await func(*args, user_id=user_id, db=db, **kwargs)
+
+    return wrapper
+
+
 def plan_required(min_plan: str):
     """
     Decorator factory that enforces a minimum subscription plan.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { searchPapers, type Paper } from "@/lib/api";
+import { searchPapers, type Paper, type SearchFilters } from "@/lib/api";
 
 interface PaperSearchPanelProps {
   /** Called when the user selects a paper to add to the current note */
@@ -172,8 +172,89 @@ function DetailPanel({ paper, onClose, onSelect }: DetailPanelProps) {
 // Main component
 // ────────────────────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────────────────────
+// Filter panel
+// ────────────────────────────────────────────────────────────────────────────
+
+interface FilterPanelProps {
+  filters: SearchFilters;
+  onChange: (f: SearchFilters) => void;
+}
+
+function FilterPanel({ filters, onChange }: FilterPanelProps) {
+  return (
+    <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+      {/* Year range */}
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-slate-600">출판 연도</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            placeholder="시작"
+            min={1900}
+            max={new Date().getFullYear()}
+            value={filters.year_from ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                year_from: e.target.value ? Number(e.target.value) : undefined,
+              })
+            }
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-blue-400 focus:outline-none"
+          />
+          <span className="text-xs text-slate-400">~</span>
+          <input
+            type="number"
+            placeholder="종료"
+            min={1900}
+            max={new Date().getFullYear()}
+            value={filters.year_to ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                year_to: e.target.value ? Number(e.target.value) : undefined,
+              })
+            }
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-blue-400 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Source radio */}
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-slate-600">출처</p>
+        <div className="flex gap-3">
+          {(
+            [
+              { value: "all",              label: "전체" },
+              { value: "arxiv",            label: "arXiv" },
+              { value: "semantic_scholar", label: "Semantic Scholar" },
+            ] as const
+          ).map(({ value, label }) => (
+            <label key={value} className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name="source"
+                value={value}
+                checked={(filters.source ?? "all") === value}
+                onChange={() => onChange({ ...filters, source: value })}
+                className="accent-blue-600"
+              />
+              <span className="text-xs text-slate-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Main component
+// ────────────────────────────────────────────────────────────────────────────
+
 /**
- * Paper search panel with results list and a slide-over detail view.
+ * Paper search panel with results list, filter toggle, and slide-over detail.
  *
  * Props:
  *   onSelectPaper  — callback when user clicks "노트에 추가" in the detail panel
@@ -184,19 +265,21 @@ export default function PaperSearchPanel({
   initialQuery = "",
 }: PaperSearchPanelProps) {
   const [query, setQuery] = useState(initialQuery);
+  const [filters, setFilters] = useState<SearchFilters>({ source: "all" });
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [results, setResults] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const runSearch = async (q: string) => {
+  const runSearch = async (q: string, f: SearchFilters = filters) => {
     const trimmed = q.trim();
     if (!trimmed) return;
     setLoading(true);
     setError(null);
     try {
-      const papers = await searchPapers(trimmed);
+      const papers = await searchPapers(trimmed, f);
       setResults(papers);
     } catch (err) {
       setError(err instanceof Error ? err.message : "검색 중 오류가 발생했습니다.");
@@ -216,10 +299,19 @@ export default function PaperSearchPanel({
     runSearch(query);
   };
 
+  // Re-run search when filter changes (only if there's an active query)
+  const handleFilterChange = (f: SearchFilters) => {
+    setFilters(f);
+    if (query.trim()) runSearch(query, f);
+  };
+
+  const hasActiveFilters =
+    !!filters.year_from || !!filters.year_to || (filters.source && filters.source !== "all");
+
   return (
     <div className="flex h-full flex-col">
       {/* Search bar */}
-      <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
+      <form onSubmit={handleSubmit} className="mb-2 flex gap-2">
         <input
           ref={inputRef}
           value={query}
@@ -235,6 +327,25 @@ export default function PaperSearchPanel({
           검색
         </button>
       </form>
+
+      {/* Filter toggle */}
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((o) => !o)}
+        className={`mb-3 flex items-center gap-1.5 self-start rounded-lg px-2.5 py-1 text-xs transition ${
+          hasActiveFilters
+            ? "bg-blue-50 text-blue-700 font-medium"
+            : "text-slate-500 hover:bg-slate-100"
+        }`}
+      >
+        <span>{filtersOpen ? "▲" : "▼"}</span>
+        필터{hasActiveFilters ? " (적용 중)" : ""}
+      </button>
+
+      {/* Filter panel */}
+      {filtersOpen && (
+        <FilterPanel filters={filters} onChange={handleFilterChange} />
+      )}
 
       {/* Error */}
       {error && (

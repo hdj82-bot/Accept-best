@@ -9,6 +9,7 @@ import ResearchEditor, {
   type ResearchEditorHandle,
 } from "@/components/ResearchEditor";
 import VersionHistory from "@/components/VersionHistory";
+import ExportButton from "@/components/ExportButton";
 import { getNote, updateNote, type Paper, type ResearchNote } from "@/lib/api";
 
 export default function ResearchDetailPage() {
@@ -127,18 +128,23 @@ function ResearchDetailContent() {
             )}
           </div>
 
-          {/* Version history toggle */}
-          <button
-            onClick={() => setHistoryOpen((o) => !o)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition ${
-              historyOpen
-                ? "border-blue-300 bg-blue-50 text-blue-700"
-                : "border-slate-200 text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <span>🕐</span>
-            버전 히스토리
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export button */}
+            {id && <ExportButton noteId={id} />}
+
+            {/* Version history toggle */}
+            <button
+              onClick={() => setHistoryOpen((o) => !o)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition ${
+                historyOpen
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <span>🕐</span>
+              버전 히스토리
+            </button>
+          </div>
         </div>
       </header>
 

@@ -37,7 +37,15 @@ function DashboardContent() {
       <header className="border-b border-slate-200 bg-white px-6 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-800">논문집필 도우미</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {user?.plan === "free" && (
+              <Link
+                href="/billing"
+                className="rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                플랜 업그레이드 ↑
+              </Link>
+            )}
             <span className="text-sm text-slate-600">{session?.user?.email}</span>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}

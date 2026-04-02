@@ -5,6 +5,7 @@ from celery import Celery
 CELERY_TASK_ROUTES = {
     "app.tasks.collect.*": {"queue": "collect"},
     "app.tasks.process.*": {"queue": "process"},
+    "app.tasks.export.*": {"queue": "export"},
 }
 
 celery_app = Celery(
@@ -14,6 +15,7 @@ celery_app = Celery(
     include=[
         "app.tasks.collect",
         "app.tasks.process",
+        "app.tasks.export",
     ],
 )
 
