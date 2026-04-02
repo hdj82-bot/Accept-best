@@ -72,17 +72,27 @@ export default function UsageIndicator({ plan }: UsageIndicatorProps) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-slate-700">이번 달 사용량</span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-            plan === "pro"
-              ? "bg-violet-100 text-violet-700"
-              : plan === "basic"
-              ? "bg-blue-100 text-blue-700"
-              : "bg-slate-100 text-slate-600"
-          }`}
-        >
-          {plan === "free" ? "무료" : plan === "basic" ? "Basic" : "Pro"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              plan === "pro"
+                ? "bg-violet-100 text-violet-700"
+                : plan === "basic"
+                ? "bg-blue-100 text-blue-700"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {plan === "free" ? "무료" : plan === "basic" ? "Basic" : "Pro"}
+          </span>
+          {(plan === "free" || plan === "basic") && (
+            <Link
+              href="/billing"
+              className="rounded-full bg-blue-600 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-blue-700 transition"
+            >
+              업그레이드
+            </Link>
+          )}
+        </div>
       </div>
 
       {usage ? (
@@ -107,7 +117,7 @@ export default function UsageIndicator({ plan }: UsageIndicatorProps) {
             더 많은 기능을 사용하려면 플랜을 업그레이드하세요.
           </p>
           <Link
-            href="/pricing"
+            href="/billing"
             className="mt-2 inline-block rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
           >
             플랜 업그레이드 →

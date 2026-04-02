@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import UsageIndicator from "@/components/UsageIndicator";
@@ -232,6 +233,7 @@ function PlanCard({
 // ────────────────────────────────────────────────────────────────────────────
 
 function BillingContent() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<CurrentBilling | null>(null);
   const [plans, setPlans] = useState<BillingPlan[]>(FALLBACK_PLANS);
@@ -263,6 +265,7 @@ function BillingContent() {
           setUser((u) => u ? { ...u, plan } : u);
           setBilling((b) => b ? { ...b, plan, expires_at: res.expires_at } : b);
           showToast("플랜이 업그레이드되었습니다.", "success");
+          setTimeout(() => router.push("/dashboard"), 1500);
         }
         setUpgrading(false);
         return;
@@ -299,6 +302,7 @@ function BillingContent() {
               setUser((u) => u ? { ...u, plan } : u);
               setBilling((b) => b ? { ...b, plan, expires_at: res.expires_at } : b);
               showToast("플랜이 업그레이드되었습니다.", "success");
+              setTimeout(() => router.push("/dashboard"), 1500);
             } else {
               showToast("결제 검증에 실패했습니다.", "error");
             }

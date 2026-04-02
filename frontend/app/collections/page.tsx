@@ -159,7 +159,7 @@ function CollectionsContent() {
     setLoadingTag(true);
     try {
       const result = await getPapersByTag(tag);
-      setTagPapers(result.items);
+      setTagPapers(result);
     } catch { setTagPapers([]); }
     setLoadingTag(false);
   };

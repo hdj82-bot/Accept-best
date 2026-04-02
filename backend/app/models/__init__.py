@@ -8,6 +8,9 @@ from .research_notes import ResearchNote
 from .bookmark import Bookmark
 from .search_history import SearchHistory
 from .reference import Reference
+from .share_token import ShareToken
+from .payment import Payment
+from .collection import Collection, CollectionPaper, PaperTag
 
 __all__ = [
     "Base",
@@ -20,4 +23,9 @@ __all__ = [
     "Bookmark",
     "SearchHistory",
     "Reference",
+    "ShareToken",
+    "Payment",
+    "Collection",
+    "CollectionPaper",
+    "PaperTag",
 ]

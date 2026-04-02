@@ -24,6 +24,14 @@ from app.models import (  # noqa: F401, E402 – side-effect imports register ta
     SurveyQuestion,
     PaperVersion,
     ResearchNote,
+    Bookmark,
+    SearchHistory,
+    Reference,
+    ShareToken,
+    Payment,
+    Collection,
+    CollectionPaper,
+    PaperTag,
 )
 
 target_metadata = Base.metadata
