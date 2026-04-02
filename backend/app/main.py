@@ -5,14 +5,15 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.api import (
     health_router, users_router, research_router, papers_router,
     versions_router, survey_router, export_router,
-    billing_router, admin_router,
+    billing_router, admin_router, bookmarks_router,
 )
 
 settings = get_settings()
@@ -67,3 +68,11 @@ app.include_router(survey_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(bookmarks_router, prefix="/api")
+
+
+# ── Prometheus metrics ─────────────────────────────────────────────────────────
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

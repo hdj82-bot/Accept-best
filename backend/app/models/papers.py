@@ -26,7 +26,9 @@ class Paper(Base):
     doi = Column(String(255), nullable=True)
     url = Column(Text, nullable=True)
     pdf_url = Column(Text, nullable=True)
+    year = Column(Integer, nullable=True)
     citation_count = Column(Integer, nullable=True, default=0)
+    journal = Column(String, nullable=True)
     summary = Column(Text, nullable=True)              # Claude-generated summary
     embedding = Column(Vector(1536), nullable=True)    # text-embedding-3-small
     metadata_ = Column("metadata", JSONB, nullable=True)

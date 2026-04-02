@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from app.core.config import get_settings
+from app.core.metrics import export_jobs_total
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
 
     use_fixtures = os.getenv("USE_FIXTURES", "false").lower() in ("1", "true", "yes")
     if use_fixtures:
+        export_jobs_total.labels(format="markdown", status="success").inc()
         return markdown_str
 
     # Upload to S3 and return presigned URL
@@ -130,6 +132,7 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
         Params={"Bucket": bucket, "Key": key},
         ExpiresIn=3600,
     )
+    export_jobs_total.labels(format="markdown", status="success").inc()
     return url
 
 
@@ -176,6 +179,7 @@ def export_research_pdf(note_id: str, user_id: str) -> str:
 
     use_fixtures = os.getenv("USE_FIXTURES", "false").lower() in ("1", "true", "yes")
     if use_fixtures:
+        export_jobs_total.labels(format="pdf", status="success").inc()
         return "fixtures_pdf_export"
 
     # Convert markdown -> HTML -> PDF
@@ -208,4 +212,5 @@ def export_research_pdf(note_id: str, user_id: str) -> str:
         Params={"Bucket": bucket, "Key": key},
         ExpiresIn=3600,
     )
+    export_jobs_total.labels(format="pdf", status="success").inc()
     return url

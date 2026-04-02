@@ -1,11 +1,13 @@
 import os
 
 from celery import Celery
+from celery.schedules import crontab
 
 CELERY_TASK_ROUTES = {
     "app.tasks.collect.*": {"queue": "collect"},
     "app.tasks.process.*": {"queue": "process"},
     "app.tasks.export.*": {"queue": "export"},
+    "app.tasks.scheduled.*": {"queue": "default"},
 }
 
 celery_app = Celery(
@@ -16,6 +18,7 @@ celery_app = Celery(
         "app.tasks.collect",
         "app.tasks.process",
         "app.tasks.export",
+        "app.tasks.scheduled",
     ],
 )
 
@@ -31,3 +34,14 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
 )
+
+celery_app.conf.beat_schedule = {
+    "expire-plans-daily": {
+        "task": "app.tasks.scheduled.expire_plans",
+        "schedule": crontab(hour=0, minute=0),
+    },
+    "cleanup-versions-hourly": {
+        "task": "app.tasks.scheduled.cleanup_old_auto_versions",
+        "schedule": crontab(minute=0),
+    },
+}

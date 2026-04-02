@@ -72,6 +72,18 @@ services:
         limits:
           memory: 256m
 
+  celery-beat:
+    image: ${DOCKERHUB_USERNAME}/academi-backend:latest
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks beat --loglevel=info
+    restart: always
+
   frontend:
     image: ${DOCKERHUB_USERNAME}/academi-frontend:latest
     env_file:
