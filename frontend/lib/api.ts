@@ -868,6 +868,37 @@ export async function checkupNote(noteId: string, token?: string): Promise<Check
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Gap analysis
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface GapItem {
+  title: string;
+  description: string;
+  severity: "high" | "medium" | "low";
+}
+
+export interface GapAnalysisResult {
+  summary: string;
+  gaps: GapItem[];
+  opportunities: string[];
+  paper_count: number;
+  fixture?: boolean;
+}
+
+/** POST /research/:noteId/gap-analysis */
+export async function analyzeGap(
+  noteId: string,
+  token?: string,
+): Promise<GapAnalysisResult> {
+  const res = await fetchWithAuth(
+    `/research/${encodeURIComponent(noteId)}/gap-analysis`,
+    { method: "POST" },
+    token,
+  );
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // References
 // ────────────────────────────────────────────────────────────────────────────
 

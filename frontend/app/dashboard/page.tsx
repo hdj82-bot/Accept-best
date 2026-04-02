@@ -207,6 +207,7 @@ const QUICK_LINKS = [
   { href: "/survey",      icon: "❓", label: "설문문항 생성" },
   { href: "/checkup",     icon: "🔍", label: "논문 건강검진" },
   { href: "/versions",    icon: "📝", label: "버전 기록" },
-  { href: "/refs",        icon: "📚", label: "참고문헌 관리" },
+  { href: "/refs",         icon: "📚", label: "참고문헌 관리" },
+  { href: "/gap-analysis", icon: "🔬", label: "연구 공백 발견" },
   { href: "/settings",    icon: "⚙️",  label: "계정 설정" },
 ];

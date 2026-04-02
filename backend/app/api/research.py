@@ -184,6 +184,27 @@ async def checkup_research_note(
         }
 
 
+@router.post("/{note_id}/gap-analysis")
+async def gap_analysis(
+    note_id: uuid.UUID,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    연구 공백 발견 — pro 플랜 전용.
+    note_id에 연결된 수집 논문들을 Claude로 분석.
+    """
+    user = await get_user_by_id(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.plan != "pro":
+        raise HTTPException(status_code=403, detail="연구 공백 발견은 pro 플랜 전용입니다.")
+
+    from app.services.gap_service import analyze_research_gap
+
+    return await analyze_research_gap(str(note_id), user_id, db)
+
+
 @router.delete("/{note_id}", status_code=204)
 async def delete_research_note(
     note_id: uuid.UUID,
