@@ -7,6 +7,7 @@ from .paper_versions import PaperVersion
 from .research_notes import ResearchNote
 from .bookmark import Bookmark
 from .search_history import SearchHistory
+from .reference import Reference
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "ResearchNote",
     "Bookmark",
     "SearchHistory",
+    "Reference",
 ]

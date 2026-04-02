@@ -201,10 +201,12 @@ function DashboardContent() {
 }
 
 const QUICK_LINKS = [
-  { href: "/research",   icon: "📄", label: "논문 수집 · 노트" },
-  { href: "/bookmarks",  icon: "🤍", label: "내 북마크" },
-  { href: "/survey",     icon: "❓", label: "설문문항 생성" },
-  { href: "/checkup",    icon: "🔍", label: "논문 건강검진" },
-  { href: "/versions",   icon: "📝", label: "논문 버전 관리" },
-  { href: "/refs",       icon: "📚", label: "참고문헌 관리" },
+  { href: "/research",    icon: "📄", label: "논문 수집 · 노트" },
+  { href: "/bookmarks",   icon: "🤍", label: "내 북마크" },
+  { href: "/collections", icon: "📁", label: "컬렉션 · 태그" },
+  { href: "/survey",      icon: "❓", label: "설문문항 생성" },
+  { href: "/checkup",     icon: "🔍", label: "논문 건강검진" },
+  { href: "/versions",    icon: "📝", label: "버전 기록" },
+  { href: "/refs",        icon: "📚", label: "참고문헌 관리" },
+  { href: "/settings",    icon: "⚙️",  label: "계정 설정" },
 ];

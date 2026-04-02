@@ -826,3 +826,112 @@ export async function getMyShareTokens(token?: string): Promise<ShareToken[]> {
   const res = await fetchWithAuth("/share/", {}, token);
   return res.json();
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// User profile update
+// ────────────────────────────────────────────────────────────────────────────
+
+/** PATCH /users/me */
+export async function updateMe(data: { name?: string }, token?: string): Promise<User> {
+  const res = await fetchWithAuth(
+    "/users/me",
+    { method: "PATCH", body: JSON.stringify(data) },
+    token,
+  );
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Paper health check
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface CheckupResult {
+  scores: {
+    structure: number;
+    clarity: number;
+    originality: number;
+    overall: number;
+  };
+  summary: string;
+  strengths: string[];
+  suggestions: string[];
+}
+
+/** POST /research/:noteId/checkup */
+export async function checkupNote(noteId: string, token?: string): Promise<CheckupResult> {
+  const res = await fetchWithAuth(
+    `/research/${encodeURIComponent(noteId)}/checkup`,
+    { method: "POST" },
+    token,
+  );
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// References
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface Reference {
+  id: string;
+  user_id: string;
+  title: string;
+  authors: string[];
+  journal: string | null;
+  year: number | null;
+  doi: string | null;
+  cite_key: string | null;
+  created_at: string;
+}
+
+export interface CreateReferenceData {
+  title: string;
+  authors?: string[];
+  journal?: string;
+  year?: number;
+  doi?: string;
+  cite_key?: string;
+}
+
+/** GET /refs/ */
+export async function getReferences(token?: string): Promise<Reference[]> {
+  const res = await fetchWithAuth("/refs/", {}, token);
+  return res.json();
+}
+
+/** POST /refs/ */
+export async function createReference(
+  data: CreateReferenceData,
+  token?: string,
+): Promise<Reference> {
+  const res = await fetchWithAuth(
+    "/refs/",
+    { method: "POST", body: JSON.stringify(data) },
+    token,
+  );
+  return res.json();
+}
+
+/** PATCH /refs/:id */
+export async function updateReference(
+  id: string,
+  data: Partial<CreateReferenceData>,
+  token?: string,
+): Promise<Reference> {
+  const res = await fetchWithAuth(
+    `/refs/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(data) },
+    token,
+  );
+  return res.json();
+}
+
+/** DELETE /refs/:id */
+export async function deleteReference(id: string, token?: string): Promise<void> {
+  await fetchWithAuth(`/refs/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
+}
+
+/** GET /refs/export/bibtex → plain text */
+export async function exportBibtex(token?: string): Promise<string> {
+  const res = await fetchWithAuth("/refs/export/bibtex", {}, token);
+  return res.text();
+}
