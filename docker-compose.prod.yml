@@ -88,6 +88,7 @@ services:
     image: ${DOCKERHUB_USERNAME}/academi-frontend:latest
     env_file:
       - .env
+    # TODO: ensure NEXTAUTH_URL=https://your-domain.com is set in .env
     depends_on:
       - backend
     restart: always

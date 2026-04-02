@@ -26,3 +26,7 @@ shell-db:
 
 seed:
 	docker compose exec backend python -m app.scripts.seed
+
+format:
+	docker compose exec backend ruff format .
+	docker compose exec backend ruff check --fix .
