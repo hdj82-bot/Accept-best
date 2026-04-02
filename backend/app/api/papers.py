@@ -17,6 +17,7 @@ from app.core.database import get_db
 from app.core.exceptions import NotFoundError
 from app.core.metrics import paper_search_total
 from app.models.bookmark import Bookmark
+from app.models.collection import PaperTag
 from app.models.papers import Paper
 from app.models.search_history import SearchHistory, SEARCH_HISTORY_LIMIT
 from app.models.survey_questions import SurveyQuestion
@@ -33,6 +34,7 @@ settings = get_settings()
 
 class PaperSearchRead(PaperRead):
     is_bookmarked: bool = False
+    user_tags: List[str] = []
 
 
 class SearchBody(BaseModel):
@@ -126,8 +128,9 @@ async def search_papers(
         paper_map = {str(p.id): p for p in papers}
         papers = [paper_map[pid] for pid in reranked_ids if pid in paper_map]
 
-    # ── is_bookmarked 필드 ────────────────────────────────────────────────────
+    # ── is_bookmarked + user_tags 필드 ───────────────────────────────────────
     bookmarked_ids: set[uuid.UUID] = set()
+    tags_map: dict[uuid.UUID, list[str]] = {}
     if user_id and papers:
         paper_ids = [p.id for p in papers]
         bm_result = await db.execute(
@@ -137,6 +140,16 @@ async def search_papers(
             )
         )
         bookmarked_ids = {row[0] for row in bm_result.fetchall()}
+
+        # 논문별 태그 일괄 조회
+        tag_result = await db.execute(
+            select(PaperTag.paper_id, PaperTag.tag).where(
+                PaperTag.user_id == uuid.UUID(user_id),
+                PaperTag.paper_id.in_(paper_ids),
+            ).order_by(PaperTag.tag)
+        )
+        for row in tag_result.fetchall():
+            tags_map.setdefault(row[0], []).append(row[1])
 
     results = []
     for p in papers:
@@ -148,6 +161,7 @@ async def search_papers(
         else:
             data = PaperSearchRead.model_validate(p)
         data.is_bookmarked = p.id in bookmarked_ids
+        data.user_tags = tags_map.get(p.id, [])
         results.append(data)
 
     # ── 검색 히스토리 저장 ────────────────────────────────────────────────────
