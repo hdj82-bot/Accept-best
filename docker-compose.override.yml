@@ -1,0 +1,57 @@
+version: "3.9"
+
+# 개발 환경 전용 override — docker-compose.yml과 자동 병합됨
+# 실행: docker compose up (자동 적용)
+# 프로덕션: docker compose -f docker-compose.yml up
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: base
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - WATCHFILES_FORCE_POLLING=true
+
+  celery-collect:
+    build:
+      context: ./backend
+      target: base
+    volumes:
+      - ./backend:/app
+    environment:
+      - WATCHFILES_FORCE_POLLING=true
+
+  celery-process:
+    build:
+      context: ./backend
+      target: base
+    volumes:
+      - ./backend:/app
+    environment:
+      - WATCHFILES_FORCE_POLLING=true
+
+  frontend:
+    build:
+      context: ./frontend
+      target: deps
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    environment:
+      - WATCHPACK_POLLING=true
+
+  flower:
+    image: mher/flower:2.0
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+    depends_on:
+      - redis

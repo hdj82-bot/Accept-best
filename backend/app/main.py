@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.exceptions import AppError
-from app.api import health_router, users_router, research_router, papers_router
+from app.api import health_router, users_router, research_router, papers_router, versions_router, survey_router
 
 settings = get_settings()
 
@@ -58,8 +58,9 @@ app.include_router(users_router, prefix="/api")
 app.include_router(research_router, prefix="/api")
 
 app.include_router(papers_router, prefix="/api")
+app.include_router(versions_router, prefix="/api")
+app.include_router(survey_router, prefix="/api")
 
 # 향후 추가 라우터
-# from app.api import auth_router, survey_router
+# from app.api import auth_router
 # app.include_router(auth_router, prefix="/api")
-# app.include_router(survey_router, prefix="/api")

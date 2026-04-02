@@ -1,0 +1,197 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
+import PaperSearchPanel from "@/components/PaperSearchPanel";
+import SurveyPanel from "@/components/SurveyPanel";
+import ResearchEditor, {
+  type ResearchEditorHandle,
+} from "@/components/ResearchEditor";
+import VersionHistory from "@/components/VersionHistory";
+import { getNote, updateNote, type Paper, type ResearchNote } from "@/lib/api";
+
+export default function ResearchDetailPage() {
+  return (
+    <AuthGuard>
+      <ResearchDetailContent />
+    </AuthGuard>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Main content
+// ────────────────────────────────────────────────────────────────────────────
+
+function ResearchDetailContent() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+
+  // ── Note state ──
+  const [note, setNote] = useState<ResearchNote | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // ── Selected paper (drives SurveyPanel) ──
+  const [activePaper, setActivePaper] = useState<Paper | null>(null);
+
+  // ── VersionHistory open/close ──
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // ── Ref to editor — for insertText ──
+  const editorRef = useRef<ResearchEditorHandle>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    getNote(id)
+      .then((n) => setNote(n))
+      .catch(() => setFetchError("노트를 불러오는 데 실패했습니다."))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // Called from SurveyPanel — insert adapted_q at cursor
+  const handleInsertText = (text: string) => {
+    editorRef.current?.insertText(text);
+  };
+
+  // Called from ResearchEditor manual save — keep note metadata in sync
+  const handleManualSave = async (content: string) => {
+    if (!id) return;
+    try {
+      const updated = await updateNote(id, content);
+      setNote(updated);
+    } catch { /* non-critical */ }
+  };
+
+  // Called after version restore — close history, update editor
+  const handleRestore = (content: string) => {
+    editorRef.current?.insertText(""); // focus editor
+    // Easiest approach: re-mount editor with new initial content
+    setNote((prev) => prev ? { ...prev, content } : prev);
+    setHistoryOpen(false);
+  };
+
+  // ── Loading skeleton ──
+  if (loading) {
+    return (
+      <main className="flex h-screen flex-col bg-slate-50">
+        <div className="border-b border-slate-200 bg-white px-6 py-3">
+          <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
+        </div>
+        <div className="flex flex-1 gap-4 p-6">
+          <div className="w-72 animate-pulse rounded-2xl bg-slate-100" />
+          <div className="flex-1 animate-pulse rounded-2xl bg-slate-100" />
+          <div className="w-72 animate-pulse rounded-2xl bg-slate-100" />
+        </div>
+      </main>
+    );
+  }
+
+  // ── Error state ──
+  if (fetchError && !note) {
+    return (
+      <main className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <p className="text-slate-600">{fetchError}</p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="mt-4 text-sm text-blue-600 hover:underline"
+          >
+            대시보드로 돌아가기
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  const searchHint = (note?.content ?? "").split(/\s+/).slice(0, 6).join(" ");
+
+  return (
+    <main className="flex h-screen flex-col bg-slate-50">
+      {/* ── Header ── */}
+      <header className="border-b border-slate-200 bg-white px-6 py-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="text-sm text-slate-500 hover:text-slate-800"
+            >
+              ← 대시보드
+            </button>
+            <h1 className="text-base font-semibold text-slate-800">연구 노트 편집</h1>
+            {note && (
+              <span className="text-xs text-slate-400">
+                {new Date(note.created_at).toLocaleDateString("ko-KR")} 작성
+              </span>
+            )}
+          </div>
+
+          {/* Version history toggle */}
+          <button
+            onClick={() => setHistoryOpen((o) => !o)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition ${
+              historyOpen
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "border-slate-200 text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <span>🕐</span>
+            버전 히스토리
+          </button>
+        </div>
+      </header>
+
+      {/* ── Three-column body ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Col 1: Paper search + Survey ── */}
+        <div className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-200 bg-white p-4">
+          {/* Paper search */}
+          <div className="flex flex-col" style={{ minHeight: activePaper ? "220px" : "100%" }}>
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">논문 검색</h2>
+            <PaperSearchPanel
+              onSelectPaper={(paper) => setActivePaper(paper)}
+              initialQuery={searchHint}
+            />
+          </div>
+
+          {/* Survey panel — appears when a paper is selected */}
+          {activePaper && (
+            <div className="flex-1 min-h-0">
+              <SurveyPanel
+                paperId={activePaper.id}
+                paperTitle={activePaper.title}
+                onInsert={handleInsertText}
+                onClose={() => setActivePaper(null)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ── Col 2: Research editor (flex-1) ── */}
+        <div className="flex flex-1 flex-col overflow-hidden p-6 min-w-0">
+          {note && (
+            // key forces re-mount when content is restored from a version
+            <ResearchEditor
+              key={note.content.slice(0, 20) + note.content.length}
+              ref={editorRef}
+              noteId={id}
+              initialContent={note.content}
+              onManualSave={handleManualSave}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Version history slide panel (overlays from right) ── */}
+      {id && (
+        <VersionHistory
+          noteId={id}
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          onRestore={handleRestore}
+        />
+      )}
+    </main>
+  );
+}

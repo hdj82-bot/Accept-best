@@ -34,13 +34,44 @@ _TestingSessionLocal = async_sessionmaker(
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def create_tables():
-    """Create all tables once per test session."""
+    """Create all tables once per test session.
+
+    SQLite (used for unit tests) does not support PostgreSQL-specific types such
+    as ARRAY, JSONB or pgvector's Vector.  We patch those column types to plain
+    SQLAlchemy Text/JSON before running CREATE TABLE, then restore them.
+    """
+    import sqlalchemy as sa
+    from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+    from sqlalchemy import Text, JSON
+
+    # Remap unsupported pg types to SQLite-compatible equivalents
+    type_overrides: list[tuple] = []
+    for table in Base.metadata.tables.values():
+        for col in table.columns:
+            if isinstance(col.type, ARRAY):
+                type_overrides.append((col, col.type))
+                col.type = JSON()
+            elif isinstance(col.type, JSONB):
+                type_overrides.append((col, col.type))
+                col.type = JSON()
+            else:
+                # pgvector Vector type — detected by class name to avoid import errors
+                type_name = type(col.type).__name__
+                if type_name == "Vector":
+                    type_overrides.append((col, col.type))
+                    col.type = Text()
+
     async with _engine.begin() as conn:
-        # SQLite doesn't support pgvector; skip the Vector column for unit tests
         await conn.run_sync(Base.metadata.create_all)
+
     yield
+
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+    # Restore original types so other imports remain unaffected
+    for col, original_type in type_overrides:
+        col.type = original_type
 
 
 @pytest_asyncio.fixture
