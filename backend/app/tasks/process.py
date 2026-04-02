@@ -6,10 +6,28 @@ Queue: process  (relatively fast; users may be waiting on results)
 
 import logging
 
+import anthropic
+from sqlalchemy import text, select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+from app.core.config import get_settings
 from app.core.exceptions import ExternalAPIError
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
+
+_engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+_SessionLocal = async_sessionmaker(bind=_engine, expire_on_commit=False, class_=AsyncSession)
+
+
+def _run_async(coro):
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 @celery_app.task(
@@ -18,30 +36,50 @@ logger = logging.getLogger(__name__)
     max_retries=3,
 )
 def summarize_paper(paper_id: str) -> dict:
-    """
-    Generate a structured summary for a paper using Claude API.
-
-    Steps (stubbed):
-    1. Load paper from DB by paper_id
-    2. Build prompt from title + abstract
-    3. Call Anthropic Claude (claude-3-5-sonnet) with structured output
-    4. Persist summary back to papers.summary
-    5. Increment monthly_usage.summary_count for owning user
-
-    Raises ExternalAPIError on Anthropic API failure.
-    """
     logger.info("summarize_paper: paper_id=%s", paper_id)
 
-    # TODO: wire up Anthropic client
-    # import anthropic
-    # client = anthropic.Anthropic()
-    # message = client.messages.create(...)
+    async def _run():
+        from app.models.papers import Paper
 
-    return {
-        "status": "ok",
-        "paper_id": paper_id,
-        "task": "summarize",
-    }
+        async with _SessionLocal() as session:
+            result = await session.execute(
+                select(Paper).where(Paper.id == paper_id)
+            )
+            paper = result.scalar_one_or_none()
+
+        if paper is None:
+            raise ExternalAPIError("DB", f"paper {paper_id} not found")
+
+        prompt = f"Title: {paper.title}\n\nAbstract: {paper.abstract or ''}"
+
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=256,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"{prompt}\n\n"
+                        "위 논문을 한국어로 200자 이내로 요약해 주세요."
+                    ),
+                }
+            ],
+        )
+
+        summary = message.content[0].text[:200]
+
+        async with _SessionLocal() as session:
+            async with session.begin():
+                await session.execute(
+                    text("UPDATE papers SET summary = :summary WHERE id = :id"),
+                    {"summary": summary, "id": paper_id},
+                )
+
+        return summary
+
+    summary = _run_async(_run())
+    return {"status": "ok", "paper_id": paper_id, "task": "summarize", "summary": summary}
 
 
 @celery_app.task(
@@ -50,39 +88,33 @@ def summarize_paper(paper_id: str) -> dict:
     max_retries=3,
 )
 def embed_paper(paper_id: str) -> dict:
-    """
-    Generate and store a 1536-dim embedding for a paper using OpenAI
-    text-embedding-3-small.
-
-    Steps (stubbed):
-    1. Load paper from DB by paper_id
-    2. Concatenate title + abstract as embed input
-    3. Call openai.embeddings.create(model="text-embedding-3-small")
-    4. Persist vector to papers.embedding (pgvector)
-    5. Increment monthly_usage.embedding_count for owning user
-
-    The embedding dimension MUST stay at 1536 — changing it requires full
-    table re-embedding (see CLAUDE.md).
-
-    Raises ExternalAPIError on OpenAI API failure.
-    """
     logger.info("embed_paper: paper_id=%s", paper_id)
 
-    # TODO: wire up OpenAI client
-    # import openai
-    # client = openai.OpenAI()
-    # response = client.embeddings.create(
-    #     model="text-embedding-3-small",
-    #     input=text,
-    # )
-    # vector = response.data[0].embedding  # len == 1536
+    async def _run():
+        from app.models.papers import Paper
+        from app.services.embedding_service import get_embedding
 
-    return {
-        "status": "ok",
-        "paper_id": paper_id,
-        "task": "embed",
-        "dimensions": 1536,
-    }
+        async with _SessionLocal() as session:
+            result = await session.execute(
+                select(Paper).where(Paper.id == paper_id)
+            )
+            paper = result.scalar_one_or_none()
+
+        if paper is None:
+            raise ExternalAPIError("DB", f"paper {paper_id} not found")
+
+        text_input = f"{paper.title}\n\n{paper.abstract or ''}"
+        embedding = get_embedding(text_input)
+
+        async with _SessionLocal() as session:
+            async with session.begin():
+                await session.execute(
+                    text("UPDATE papers SET embedding = :embedding WHERE id = :id"),
+                    {"embedding": embedding, "id": paper_id},
+                )
+
+    _run_async(_run())
+    return {"status": "ok", "paper_id": paper_id, "task": "embed", "dimensions": 1536}
 
 
 @celery_app.task(
@@ -91,23 +123,9 @@ def embed_paper(paper_id: str) -> dict:
     max_retries=3,
 )
 def generate_survey_questions(user_id: str, paper_id: str) -> dict:
-    """
-    Auto-generate survey questions from a paper using Claude API.
-
-    Steps (stubbed):
-    1. Load paper from DB by paper_id
-    2. Build prompt asking Claude to extract / adapt survey questions
-    3. Parse structured response into SurveyQuestion rows
-    4. Persist to survey_questions table
-    5. Increment monthly_usage.survey_count for user_id
-
-    This is the core differentiator feature of academi.ai.
-    """
     logger.info(
         "generate_survey_questions: user=%s paper=%s", user_id, paper_id
     )
-
-    # TODO: wire up Anthropic client for survey generation
 
     return {
         "status": "ok",

@@ -10,6 +10,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -98,3 +99,50 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+
+
+# ── httpx mock fixtures ───────────────────────────────────────────────────────
+
+@pytest.fixture
+def mock_httpx_get():
+    """Mock httpx.get for external API calls in collect tasks."""
+    with patch("app.tasks.collect.httpx") as mock_httpx:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"data": []}
+        mock_httpx.get.return_value = mock_resp
+        yield mock_httpx
+
+
+@pytest.fixture
+def mock_arxiv_client():
+    """Mock arxiv.Client for collect tasks."""
+    with patch("app.tasks.collect.arxiv") as mock_arxiv:
+        mock_client = MagicMock()
+        mock_arxiv.Client.return_value = mock_client
+        mock_arxiv.Search.return_value = MagicMock()
+        mock_client.results.return_value = iter([])
+        yield mock_arxiv
+
+
+@pytest.fixture
+def mock_anthropic_client():
+    """Mock anthropic.Anthropic for process tasks."""
+    with patch("app.tasks.process.anthropic") as mock_anthropic:
+        mock_client = MagicMock()
+        mock_anthropic.Anthropic.return_value = mock_client
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="테스트 요약입니다.")]
+        mock_client.messages.create.return_value = mock_message
+        yield mock_client
+
+
+@pytest.fixture
+def mock_openai_embedding():
+    """Mock OpenAI embedding client for embedding tasks."""
+    with patch("app.services.embedding_service._client") as mock_client:
+        fake_embedding = [0.0] * 1536
+        mock_resp = MagicMock()
+        mock_resp.data = [MagicMock(embedding=fake_embedding)]
+        mock_client.embeddings.create.return_value = mock_resp
+        yield mock_client

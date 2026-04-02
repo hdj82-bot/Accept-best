@@ -7,10 +7,50 @@ Queue: collect  (slow I/O-bound tasks — always include sleep(3) between API ca
 import logging
 from time import sleep
 
+import arxiv
+import httpx
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+from app.core.config import get_settings
 from app.core.exceptions import RateLimitError, ExternalAPIError
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
+
+_engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+_SessionLocal = async_sessionmaker(bind=_engine, expire_on_commit=False, class_=AsyncSession)
+
+
+def _run_async(coro):
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+async def _upsert_paper(session: AsyncSession, paper_data: dict) -> str | None:
+    result = await session.execute(
+        text("""
+            INSERT INTO papers (id, source, source_id, title, abstract, authors, author_ids,
+                                keywords, published_at, doi, url, pdf_url, citation_count,
+                                created_at, updated_at)
+            VALUES (
+                gen_random_uuid(),
+                :source, :source_id, :title, :abstract, :authors, :author_ids,
+                :keywords, :published_at, :doi, :url, :pdf_url, :citation_count,
+                now(), now()
+            )
+            ON CONFLICT (source, source_id) DO NOTHING
+            RETURNING id
+        """),
+        paper_data,
+    )
+    row = result.fetchone()
+    return str(row[0]) if row else None
 
 
 @celery_app.task(
@@ -20,31 +60,44 @@ logger = logging.getLogger(__name__)
     retry_backoff=True,
     max_retries=5,
 )
-def collect_arxiv_papers(user_id: str, keyword: str, max_results: int = 20) -> dict:
-    """
-    Fetch papers from arXiv by keyword and persist them to the DB.
+def collect_arxiv_papers(query: str, max_results: int = 10) -> list:
+    logger.info("collect_arxiv_papers: query=%s max_results=%d", query, max_results)
 
-    Steps (stubbed):
-    1. Query arXiv API (http://export.arxiv.org/api/query)
-    2. Parse Atom feed entries
-    3. Upsert into papers table (source='arxiv', source_id=<arxiv_id>)
-    4. Enqueue process.summarize_and_embed_paper for each new paper
-    5. Increment monthly_usage.research_count for user_id
+    sleep(3)
 
-    Rate-limit note: arXiv asks for >= 3 s between requests.
-    """
-    logger.info("collect_arxiv_papers: user=%s keyword=%s", user_id, keyword)
+    client = arxiv.Client()
+    search = arxiv.Search(query=query, max_results=max_results)
 
-    # TODO: replace stub with real arXiv HTTP client
-    sleep(3)  # mandatory courtesy delay for arXiv API
+    papers_data = []
+    for result in client.results(search):
+        arxiv_id = result.entry_id.split("/")[-1]
+        papers_data.append({
+            "source": "arxiv",
+            "source_id": arxiv_id,
+            "title": result.title,
+            "abstract": result.summary,
+            "authors": [a.name for a in result.authors] if result.authors else None,
+            "author_ids": None,
+            "keywords": result.categories if result.categories else None,
+            "published_at": result.published,
+            "doi": result.doi,
+            "url": result.entry_id,
+            "pdf_url": result.pdf_url,
+            "citation_count": 0,
+        })
 
-    return {
-        "status": "ok",
-        "source": "arxiv",
-        "user_id": user_id,
-        "keyword": keyword,
-        "collected": 0,  # update once real logic is wired
-    }
+    collected_ids = []
+
+    async def _insert():
+        async with _SessionLocal() as session:
+            async with session.begin():
+                for pd in papers_data:
+                    paper_id = await _upsert_paper(session, pd)
+                    if paper_id:
+                        collected_ids.append(paper_id)
+
+    _run_async(_insert())
+    return collected_ids
 
 
 @celery_app.task(
@@ -54,32 +107,62 @@ def collect_arxiv_papers(user_id: str, keyword: str, max_results: int = 20) -> d
     retry_backoff=True,
     max_retries=5,
 )
-def collect_semantic_scholar_papers(
-    user_id: str, keyword: str, max_results: int = 20
-) -> dict:
-    """
-    Fetch papers from Semantic Scholar by keyword and persist them to the DB.
+def collect_semantic_scholar_papers(query: str, max_results: int = 10) -> list:
+    logger.info("collect_semantic_scholar_papers: query=%s max_results=%d", query, max_results)
 
-    Steps (stubbed):
-    1. GET https://api.semanticscholar.org/graph/v1/paper/search
-    2. Extract paperId, title, abstract, authors, year, citationCount
-    3. Upsert into papers table (source='semantic_scholar', source_id=<paperId>)
-    4. Enqueue process.summarize_and_embed_paper for each new paper
-    5. Increment monthly_usage.research_count for user_id
+    sleep(3)
 
-    Rate-limit note: free tier allows 100 req/5 min; SS_API_KEY raises to 1,000/day.
-    """
-    logger.info(
-        "collect_semantic_scholar_papers: user=%s keyword=%s", user_id, keyword
+    headers = {}
+    if settings.ss_api_key:
+        headers["x-api-key"] = settings.ss_api_key
+
+    resp = httpx.get(
+        "https://api.semanticscholar.org/graph/v1/paper/search",
+        params={
+            "query": query,
+            "limit": max_results,
+            "fields": "paperId,title,abstract,authors,year,citationCount,externalIds,url",
+        },
+        headers=headers,
+        timeout=30,
     )
 
-    # TODO: replace stub with real Semantic Scholar HTTP client
-    sleep(3)  # mandatory courtesy delay between API calls
+    if resp.status_code == 429:
+        raise RateLimitError("SemanticScholar")
+    if resp.status_code != 200:
+        raise ExternalAPIError("SemanticScholar", resp.text)
 
-    return {
-        "status": "ok",
-        "source": "semantic_scholar",
-        "user_id": user_id,
-        "keyword": keyword,
-        "collected": 0,  # update once real logic is wired
-    }
+    data = resp.json().get("data", [])
+
+    papers_data = []
+    for item in data:
+        author_names = [a.get("name") for a in item.get("authors", []) if a.get("name")]
+        author_ids = [a.get("authorId") for a in item.get("authors", []) if a.get("authorId")]
+        external_ids = item.get("externalIds") or {}
+        papers_data.append({
+            "source": "semantic_scholar",
+            "source_id": item["paperId"],
+            "title": item.get("title", ""),
+            "abstract": item.get("abstract"),
+            "authors": author_names if author_names else None,
+            "author_ids": author_ids if author_ids else None,
+            "keywords": None,
+            "published_at": None,
+            "doi": external_ids.get("DOI"),
+            "url": item.get("url"),
+            "pdf_url": None,
+            "citation_count": item.get("citationCount", 0),
+        })
+
+    collected_ids = []
+
+    async def _insert():
+        async with _SessionLocal() as session:
+            async with session.begin():
+                for pd in papers_data:
+                    paper_id = await _upsert_paper(session, pd)
+                    if paper_id:
+                        collected_ids.append(paper_id)
+
+    _run_async(_insert())
+    return collected_ids

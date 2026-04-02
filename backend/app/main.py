@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.exceptions import AppError
-from app.api.health import router as health_router
+from app.api import health_router, users_router, research_router, papers_router
 
 settings = get_settings()
 
@@ -54,7 +54,12 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 # ── Routers ───────────────────────────────────────────────────────────────────
 
 app.include_router(health_router)
+app.include_router(users_router, prefix="/api")
+app.include_router(research_router, prefix="/api")
 
-# from app.api import auth, papers, survey, notes
-# app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-# app.include_router(papers.router, prefix="/api/papers", tags=["papers"])
+app.include_router(papers_router, prefix="/api")
+
+# 향후 추가 라우터
+# from app.api import auth_router, survey_router
+# app.include_router(auth_router, prefix="/api")
+# app.include_router(survey_router, prefix="/api")
