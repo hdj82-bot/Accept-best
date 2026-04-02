@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.payment import Payment
+from app.services.billing_service import downgrade_to_free
 from app.services.payment_service import (
     PaymentVerificationError,
     create_payment_record,
@@ -73,6 +74,16 @@ async def portone_webhook(
     except PaymentVerificationError as e:
         raise HTTPException(status_code=e.status, detail=e.message)
 
+    return result
+
+
+@router.post("/cancel")
+async def cancel_subscription(
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """구독 취소 — plan을 free로, plan_expires_at을 None으로 초기화."""
+    result = await downgrade_to_free(user_id, db)
     return result
 
 

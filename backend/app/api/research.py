@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
-# plan_required 사용 위치: 예) @plan_required("basic") 을 엔드포인트 위에 추가
 from app.core.database import get_db
 from app.core.exceptions import QuotaExceededError
 from app.models.research_notes import ResearchNote
@@ -94,6 +93,95 @@ async def get_research_note(
     if not note:
         raise HTTPException(status_code=404, detail="Research note not found")
     return note
+
+
+@router.post("/{note_id}/checkup")
+async def checkup_research_note(
+    note_id: uuid.UUID,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    논문 건강검진 — pro 플랜 전용.
+    노트 내용을 Claude로 분석해 구조·명료성·개선 제안을 반환.
+    USE_FIXTURES=true 시 목업 결과 반환.
+    """
+    import os
+
+    user = await get_user_by_id(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.plan != "pro":
+        raise HTTPException(status_code=403, detail="논문 건강검진은 pro 플랜 전용입니다.")
+
+    result = await db.execute(
+        select(ResearchNote).where(
+            ResearchNote.id == note_id,
+            ResearchNote.user_id == uuid.UUID(user_id),
+        )
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="Research note not found")
+
+    content = note.content or ""
+    if isinstance(content, dict):
+        content = str(content)
+
+    if os.getenv("USE_FIXTURES", "false").lower() == "true" or not content.strip():
+        return {
+            "structure_score": 8,
+            "clarity_score": 7,
+            "originality_score": 6,
+            "overall_score": 7,
+            "summary": "연구 목적이 명확하게 제시되어 있습니다.",
+            "suggestions": [
+                "서론의 연구 배경을 좀 더 구체적으로 서술하면 좋겠습니다.",
+                "결론 부분에서 한계점과 향후 연구 방향을 추가하세요.",
+                "참고문헌 인용 형식을 통일해 주세요.",
+            ],
+            "strengths": [
+                "연구 질문이 명확합니다.",
+                "방법론 섹션이 잘 구성되어 있습니다.",
+            ],
+            "fixture": True,
+        }
+
+    try:
+        import anthropic
+
+        client = anthropic.AsyncAnthropic()
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "다음 연구 노트를 분석하고 JSON으로 결과를 반환하세요.\n"
+                        "형식: {structure_score(1-10), clarity_score(1-10), originality_score(1-10), "
+                        "overall_score(1-10), summary(string), suggestions(list[string]), strengths(list[string])}\n\n"
+                        f"노트 내용:\n{content[:3000]}"
+                    ),
+                }
+            ],
+        )
+        import json
+
+        text = message.content[0].text
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        return json.loads(text[start:end])
+    except Exception:
+        return {
+            "structure_score": 5,
+            "clarity_score": 5,
+            "originality_score": 5,
+            "overall_score": 5,
+            "summary": "분석 중 오류가 발생했습니다.",
+            "suggestions": ["다시 시도해 주세요."],
+            "strengths": [],
+        }
 
 
 @router.delete("/{note_id}", status_code=204)
