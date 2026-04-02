@@ -36,12 +36,12 @@ async def _upsert_paper(session: AsyncSession, paper_data: dict) -> str | None:
     result = await session.execute(
         text("""
             INSERT INTO papers (id, source, source_id, title, abstract, authors, author_ids,
-                                keywords, published_at, doi, url, pdf_url, citation_count,
+                                keywords, published_at, year, doi, url, pdf_url, citation_count,
                                 created_at, updated_at)
             VALUES (
                 gen_random_uuid(),
                 :source, :source_id, :title, :abstract, :authors, :author_ids,
-                :keywords, :published_at, :doi, :url, :pdf_url, :citation_count,
+                :keywords, :published_at, :year, :doi, :url, :pdf_url, :citation_count,
                 now(), now()
             )
             ON CONFLICT (source, source_id) DO NOTHING
@@ -76,10 +76,11 @@ def collect_arxiv_papers(query: str, max_results: int = 10) -> list:
             "source_id": arxiv_id,
             "title": result.title,
             "abstract": result.summary,
-            "authors": [a.name for a in result.authors] if result.authors else None,
+            "authors": [str(a) for a in result.authors] if result.authors else None,
             "author_ids": None,
             "keywords": result.categories if result.categories else None,
             "published_at": result.published,
+            "year": result.published.year if result.published else None,
             "doi": result.doi,
             "url": result.entry_id,
             "pdf_url": result.pdf_url,
@@ -136,7 +137,7 @@ def collect_semantic_scholar_papers(query: str, max_results: int = 10) -> list:
 
     papers_data = []
     for item in data:
-        author_names = [a.get("name") for a in item.get("authors", []) if a.get("name")]
+        author_names = [a.get("name", "") for a in item.get("authors", [])]
         author_ids = [a.get("authorId") for a in item.get("authors", []) if a.get("authorId")]
         external_ids = item.get("externalIds") or {}
         papers_data.append({
@@ -148,6 +149,7 @@ def collect_semantic_scholar_papers(query: str, max_results: int = 10) -> list:
             "author_ids": author_ids if author_ids else None,
             "keywords": None,
             "published_at": None,
+            "year": item.get("year"),
             "doi": external_ids.get("DOI"),
             "url": item.get("url"),
             "pdf_url": None,

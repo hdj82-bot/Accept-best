@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import List, Optional
 
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
@@ -16,7 +19,9 @@ from app.core.metrics import paper_search_total
 from app.models.bookmark import Bookmark
 from app.models.papers import Paper
 from app.models.search_history import SearchHistory, SEARCH_HISTORY_LIMIT
+from app.models.survey_questions import SurveyQuestion
 from app.schemas.papers import PaperRead
+from app.schemas.survey_questions import SurveyQuestionRead
 from app.services import paper_service
 from app.services.embedding_service import get_embedding
 from app.services import search_service
@@ -34,6 +39,7 @@ class SearchBody(BaseModel):
     year_from: Optional[int] = None
     year_to: Optional[int] = None
     source: Optional[str] = None  # 'arxiv' | 'semantic_scholar'
+    hybrid: bool = True
 
 
 class CollectBody(BaseModel):
@@ -49,15 +55,30 @@ async def search_papers(
 ):
     paper_search_total.labels(source=body.source or "all").inc()
     embedding = get_embedding(body.query)
-    papers = await search_service.search_papers_filtered(
-        embedding,
-        db,
-        limit=10,
-        year_from=body.year_from,
-        year_to=body.year_to,
-        source=body.source,
-        query_text=body.query,
-    )
+
+    if body.hybrid:
+        raw_results = await search_service.search_papers_hybrid(
+            query=body.query,
+            query_embedding=embedding,
+            db=db,
+            limit=10,
+            year_from=body.year_from,
+            year_to=body.year_to,
+            source=body.source,
+            alpha=0.7,
+        )
+        # raw_results is list[dict]; convert to Paper objects for uniform handling
+        papers = [Paper(**{k: v for k, v in r.items() if k != "score"}) for r in raw_results]
+    else:
+        papers = await search_service.search_papers_filtered(
+            embedding,
+            db,
+            limit=10,
+            year_from=body.year_from,
+            year_to=body.year_to,
+            source=body.source,
+            query_text=body.query,
+        )
 
     # ── is_bookmarked 필드 ────────────────────────────────────────────────────
     bookmarked_ids: set[uuid.UUID] = set()
@@ -130,12 +151,57 @@ async def get_search_history(
     ]
 
 
-@router.get("/papers/{paper_id}", response_model=PaperRead)
-async def get_paper(paper_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/papers/{paper_id}")
+async def get_paper(
+    paper_id: str,
+    user_id: Optional[str] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     paper = await paper_service.get_paper(paper_id, db)
     if paper is None:
         raise NotFoundError("paper")
-    return paper
+
+    # ── survey_questions for this paper / current user ────────────────────────
+    survey_questions: list[dict] = []
+    if user_id:
+        sq_result = await db.execute(
+            select(SurveyQuestion).where(
+                SurveyQuestion.paper_id == paper.id,
+                SurveyQuestion.user_id == uuid.UUID(user_id),
+            )
+        )
+        sq_rows = sq_result.scalars().all()
+        survey_questions = [SurveyQuestionRead.model_validate(sq).model_dump() for sq in sq_rows]
+
+    # ── related_papers: top 3 similar papers via embedding (exclude self) ─────
+    related_papers: list[dict] = []
+    if paper.embedding is not None:
+        try:
+            related_sql = text(
+                """
+                SELECT * FROM papers
+                WHERE id != CAST(:paper_id AS uuid)
+                ORDER BY embedding <=> CAST(:vec AS vector)
+                LIMIT 3
+                """
+            )
+            rel_result = await db.execute(
+                related_sql,
+                {"paper_id": str(paper.id), "vec": str(list(paper.embedding))},
+            )
+            for row in rel_result.mappings().all():
+                p_dict = {k: v for k, v in row.items()}
+                related_papers.append(PaperRead.model_validate(p_dict).model_dump())
+        except Exception as exc:
+            logger.warning("related_papers query failed: %s", exc)
+
+    paper_data = PaperRead.model_validate(paper).model_dump()
+    return {
+        "paper": paper_data,
+        "survey_questions": survey_questions,
+        "related_papers": related_papers,
+        "is_bookmarked": False,
+    }
 
 
 @router.post("/papers/collect")
