@@ -4,9 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   searchPapers,
   getSearchHistory,
+  translatePaper,
   type Paper,
   type SearchFilters,
   type SearchHistoryItem,
+  type TranslateResult,
 } from "@/lib/api";
 import BookmarkButton from "@/components/BookmarkButton";
 import Pagination from "@/components/Pagination";
@@ -54,6 +56,23 @@ function PaperCard({ paper, onClick, isBookmarked = false }: PaperCardProps) {
       : score >= 0.70 ? "text-amber-600"
       : "text-slate-500";
 
+  const [translation, setTranslation] = useState<TranslateResult | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState(false);
+
+  const handleTranslate = async () => {
+    setTranslating(true);
+    setTranslateError(false);
+    try {
+      const result = await translatePaper(paper.id);
+      setTranslation(result);
+    } catch {
+      setTranslateError(true);
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   return (
     <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-blue-300 hover:shadow-md">
       {/* Bookmark button — top-right, above the click area */}
@@ -65,29 +84,59 @@ function PaperCard({ paper, onClick, isBookmarked = false }: PaperCardProps) {
         onClick={onClick}
         className="w-full p-4 text-left"
       >
-      <div className="mb-1 flex items-start justify-between gap-2 pr-7">
-        <h3 className="text-sm font-semibold leading-snug text-slate-800 line-clamp-2">
-          {paper.title}
-        </h3>
-        {score !== null && (
-          <span className={`shrink-0 text-xs font-medium ${scoreColor}`}>
-            {(score * 100).toFixed(0)}%
-          </span>
+        <div className="mb-1 flex items-start justify-between gap-2 pr-7">
+          <h3 className="text-sm font-semibold leading-snug text-slate-800 line-clamp-2">
+            {paper.title}
+          </h3>
+          {score !== null && (
+            <span className={`shrink-0 text-xs font-medium ${scoreColor}`}>
+              {(score * 100).toFixed(0)}%
+            </span>
+          )}
+        </div>
+        <p className="mb-2 text-xs text-slate-500">
+          {paper.authors.slice(0, 3).join(", ")}
+          {paper.authors.length > 3 ? " 외" : ""}
+          {paper.year ? ` · ${paper.year}` : ""}
+          {" · "}
+          <span className="capitalize">{paper.source.replace("_", " ")}</span>
+        </p>
+        {paper.abstract && (
+          <p className="text-xs leading-relaxed text-slate-600 line-clamp-3">
+            {paper.abstract}
+          </p>
+        )}
+      </button>
+
+      {/* Translation section — outside the main button to avoid nesting */}
+      <div className="px-4 pb-3">
+        <div className="flex items-center gap-2">
+          {!translation && (
+            <button
+              onClick={handleTranslate}
+              disabled={translating}
+              className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
+            >
+              {translating ? "번역 중..." : "🌐 번역"}
+            </button>
+          )}
+          {translateError && (
+            <span className="text-xs text-red-500">번역 실패</span>
+          )}
+        </div>
+
+        {translation && (
+          <div className="mt-2 border-t border-slate-100 pt-3">
+            <p className="mb-1 text-xs font-medium text-slate-500">🇰🇷 한국어</p>
+            <p className="text-sm font-medium text-slate-800">{translation.title_ko}</p>
+            {translation.abstract_ko && (
+              <p className="mt-1 text-xs text-slate-500 line-clamp-3">
+                {translation.abstract_ko}
+              </p>
+            )}
+          </div>
         )}
       </div>
-      <p className="mb-2 text-xs text-slate-500">
-        {paper.authors.slice(0, 3).join(", ")}
-        {paper.authors.length > 3 ? " 외" : ""}
-        {paper.year ? ` · ${paper.year}` : ""}
-        {" · "}
-        <span className="capitalize">{paper.source.replace("_", " ")}</span>
-      </p>
-      {paper.abstract && (
-        <p className="text-xs leading-relaxed text-slate-600 line-clamp-3">
-          {paper.abstract}
-        </p>
-      )}
-      </button>
     </div>
   );
 }

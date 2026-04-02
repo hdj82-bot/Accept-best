@@ -13,6 +13,7 @@ from app.api.meta import router as meta_router
 from app.api.payment import router as payment_router
 from app.api.collections import router as collections_router
 from app.api.references import router as references_router
+from app.api.translate import router as translate_router
 
 __all__ = [
     "health_router",
@@ -30,4 +31,5 @@ __all__ = [
     "payment_router",
     "collections_router",
     "references_router",
+    "translate_router",
 ]

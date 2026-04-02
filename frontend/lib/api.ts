@@ -966,3 +966,27 @@ export async function exportBibtex(token?: string): Promise<string> {
   const res = await fetchWithAuth("/refs/export/bibtex", {}, token);
   return res.text();
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Translation
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface TranslateResult {
+  paper_id: string;
+  title_ko: string;
+  abstract_ko: string;
+  fixture?: boolean;
+}
+
+/** POST /translate/paper/:paperId */
+export async function translatePaper(
+  paperId: string,
+  token?: string,
+): Promise<TranslateResult> {
+  const res = await fetchWithAuth(
+    `/translate/paper/${encodeURIComponent(paperId)}`,
+    { method: "POST" },
+    token,
+  );
+  return res.json();
+}
