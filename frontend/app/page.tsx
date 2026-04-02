@@ -37,6 +37,22 @@ export default async function LandingPage() {
           </button>
         </form>
 
+        <form
+          className="mt-3"
+          action={async () => {
+            "use server";
+            await signIn("kakao", { redirectTo: "/dashboard" });
+          }}
+        >
+          <button
+            type="submit"
+            className="flex items-center gap-3 rounded-2xl bg-[#FEE500] px-7 py-3.5 text-sm font-semibold text-[#3C1E1E] shadow-lg transition hover:bg-yellow-300 active:scale-95"
+          >
+            <KakaoIcon />
+            카카오로 시작하기
+          </button>
+        </form>
+
         <p className="mt-3 text-xs text-slate-500">
           신용카드 불필요 · 무료 플랜 영구 제공
         </p>
@@ -94,19 +110,35 @@ export default async function LandingPage() {
       {/* CTA */}
       <section className="border-t border-slate-700 px-6 py-16 text-center">
         <p className="mb-6 text-slate-400">이미 계정이 있으신가요?</p>
-        <form
-          action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: "/dashboard" });
-          }}
-        >
-          <button
-            type="submit"
-            className="rounded-2xl border border-slate-600 bg-slate-800 px-6 py-3 text-sm font-medium text-slate-300 transition hover:bg-slate-700"
+        <div className="flex flex-col items-center gap-3">
+          <form
+            action={async () => {
+              "use server";
+              await signIn("google", { redirectTo: "/dashboard" });
+            }}
           >
-            로그인하기
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="rounded-2xl border border-slate-600 bg-slate-800 px-6 py-3 text-sm font-medium text-slate-300 transition hover:bg-slate-700"
+            >
+              로그인하기
+            </button>
+          </form>
+          <form
+            action={async () => {
+              "use server";
+              await signIn("kakao", { redirectTo: "/dashboard" });
+            }}
+          >
+            <button
+              type="submit"
+              className="flex items-center gap-3 rounded-2xl bg-[#FEE500] px-6 py-3 text-sm font-medium text-[#3C1E1E] transition hover:bg-yellow-300 active:scale-95"
+            >
+              <KakaoIcon />
+              카카오로 로그인
+            </button>
+          </form>
+        </div>
       </section>
     </main>
   );
@@ -138,6 +170,17 @@ const PRICING_ROWS = [
   { label: "AI 리랭킹",          free: "✗",   basic: "✗",    pro: "✓" },
   { label: "공유 카드 생성",      free: "✓",   basic: "✓",    pro: "✓" },
 ];
+
+function KakaoIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#3C1E1E"
+        d="M9 1.5C4.86 1.5 1.5 4.14 1.5 7.41c0 2.1 1.35 3.93 3.39 4.98l-.87 3.18a.28.28 0 0 0 .42.3L8.1 13.5c.3.03.6.06.9.06 4.14 0 7.5-2.64 7.5-5.91S13.14 1.5 9 1.5z"
+      />
+    </svg>
+  );
+}
 
 function GoogleIcon() {
   return (

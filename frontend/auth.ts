@@ -1,5 +1,6 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
+import Kakao from "next-auth/providers/kakao";
 import { SignJWT, jwtVerify } from "jose";
 
 /**
@@ -13,7 +14,7 @@ function getSecretKey(secret: string | string[]): Uint8Array {
 }
 
 export const config: NextAuthConfig = {
-  providers: [Google],
+  providers: [Google, Kakao],
   session: { strategy: "jwt" },
   callbacks: {
     jwt({ token, user }) {

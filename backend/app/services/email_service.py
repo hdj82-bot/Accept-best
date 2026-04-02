@@ -60,6 +60,30 @@ def render_research_complete(
 """.strip()
 
 
+def render_payment_complete(user_email: str, plan: str, amount: int) -> str:
+    plan_label = {"basic": "Basic", "pro": "Pro"}.get(plan, plan)
+    amount_str = f"₩{amount:,}"
+    return f"""
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>결제 완료</title></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  <h2 style="color:#1a1a2e">✅ 결제가 완료되었습니다</h2>
+  <p>안녕하세요,</p>
+  <p><strong>{plan_label}</strong> 플랜 결제({amount_str})가 정상적으로 처리되었습니다.</p>
+  <a href="https://academi.ai/dashboard"
+     style="display:inline-block;margin-top:16px;padding:12px 24px;
+            background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px">
+    대시보드로 이동
+  </a>
+  <p style="margin-top:32px;color:#666;font-size:12px">
+    이 메일은 {user_email} 계정으로 발송되었습니다.
+  </p>
+</body>
+</html>
+""".strip()
+
+
 # ── 발송 ──────────────────────────────────────────────────────────────────────
 
 def send_email(to: str, subject: str, html_body: str) -> None:

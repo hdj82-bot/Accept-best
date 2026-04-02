@@ -104,3 +104,35 @@ def send_research_complete(user_id: str, note_id: str, export_url: str) -> dict:
         return {"sent": True, "to": user.email}
 
     return _run_async(_run())
+
+
+@celery_app.task(
+    name="app.tasks.notify.send_payment_complete",
+    queue="process",
+    max_retries=3,
+)
+def send_payment_complete(user_id: str, plan: str, amount: int) -> dict:
+    logger.info("send_payment_complete: user_id=%s plan=%s amount=%d", user_id, plan, amount)
+
+    async def _run():
+        from app.models.users import User
+        from app.services.email_service import send_email, render_payment_complete
+
+        async with _SessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+        if not user:
+            return {"skipped": True, "reason": "user not found"}
+
+        html = render_payment_complete(user.email, plan, amount)
+        send_email(
+            to=user.email,
+            subject=f"[academi.ai] {plan} 플랜 결제가 완료되었습니다",
+            html_body=html,
+        )
+        return {"sent": True, "to": user.email}
+
+    return _run_async(_run())

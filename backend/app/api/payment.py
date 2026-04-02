@@ -50,6 +50,10 @@ async def complete_payment(
     except PaymentVerificationError as e:
         raise HTTPException(status_code=e.status, detail=e.message)
 
+    # 결제 완료 이메일 발송 (백그라운드)
+    from app.tasks.notify import send_payment_complete  # noqa: PLC0415
+    send_payment_complete.delay(user_id, payment.plan, payment.amount)
+
     return {
         "status": payment.status,
         "plan": payment.plan,

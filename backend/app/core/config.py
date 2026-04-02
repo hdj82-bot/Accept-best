@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # Kakao OAuth
+    kakao_client_id: str = ""
+    kakao_client_secret: str = ""
+
     # AI APIs
     openai_api_key: str = ""       # text-embedding-3-small
     anthropic_api_key: str = ""    # Claude API

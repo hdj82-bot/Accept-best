@@ -66,7 +66,7 @@ export default function RootLayout({
         src="https://cdn.iamport.kr/v1/iamport.js"
         strategy="lazyOnload"
       />
-      <body className="min-h-full flex flex-col bg-[--background] text-[--foreground]">
+      <body className="min-h-full flex flex-col bg-[--background] text-[--foreground] pb-20 lg:pb-0">
         <SessionProvider>
           <ErrorBoundary>
             {children}
