@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/bookmarks",   label: "북마크", icon: "🤍" },
   { href: "/collections", label: "컬렉션", icon: "📁" },
   { href: "/billing",     label: "플랜",   icon: "💳" },
+  { href: "/settings",    label: "설정",   icon: "⚙️" },
 ];
 
 /**
@@ -39,7 +40,7 @@ export default function GlobalNav() {
               }`}
             >
               <span className="text-lg leading-none">{icon}</span>
-              {label}
+              <span className="hidden sm:inline">{label}</span>
             </Link>
           );
         })}

@@ -47,7 +47,15 @@ function ResearchDetailContent() {
   useEffect(() => {
     if (!id) return;
     getNote(id)
-      .then((n) => setNote(n))
+      .then((n) => {
+        const restored = localStorage.getItem("restored_content");
+        if (restored) {
+          localStorage.removeItem("restored_content");
+          setNote({ ...n, content: restored });
+        } else {
+          setNote(n);
+        }
+      })
       .catch(() => setFetchError("노트를 불러오는 데 실패했습니다."))
       .finally(() => setLoading(false));
   }, [id]);

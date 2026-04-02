@@ -18,7 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 os.environ.setdefault("USE_FIXTURES", "true")
 
 from app.core.auth import get_current_user
+from app.core.database import get_db
 from app.main import app
+from app.models.bookmark import Bookmark
+from app.models.papers import Paper
 from app.models.reference import Reference
 from app.models.users import User
 from app.schemas.reference import ReferenceCreate, ReferenceUpdate
@@ -84,6 +87,26 @@ async def authed_client(user: User):
     ) as ac:
         yield ac
     app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest_asyncio.fixture
+async def authed_db_client(user: User, db_session: AsyncSession):
+    """HTTP client with both auth and get_db overridden to share the test session.
+
+    This ensures data flushed (but not committed) via db_session is visible
+    to the endpoint under test, which receives the same AsyncSession instance.
+    """
+    async def _get_db_override():
+        yield db_session
+
+    app.dependency_overrides[get_current_user] = lambda: str(user.id)
+    app.dependency_overrides[get_db] = _get_db_override
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_db, None)
 
 
 # ── Service layer: CRUD ───────────────────────────────────────────────────────
@@ -295,3 +318,54 @@ async def test_export_bibtex_via_http(authed_client: AsyncClient):
     assert resp.status_code == 200
     assert "bibtextest2024" in resp.text
     assert resp.headers["content-type"].startswith("text/plain")
+
+
+# ── HTTP layer: import from bookmarks ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_import_from_bookmarks_no_bookmarks(
+    authed_client: AsyncClient,
+):
+    """북마크가 없을 때 imported=0, skipped=0."""
+    resp = await authed_client.post("/api/references/import/bookmarks")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["imported"] == 0
+    assert data["skipped"] == 0
+
+
+@pytest.mark.asyncio
+async def test_import_skips_duplicate_doi(
+    authed_db_client: AsyncClient,
+    db_session: AsyncSession,
+    user: User,
+):
+    """같은 doi를 가진 참고문헌이 이미 있으면 skipped 카운트.
+
+    authed_db_client shares db_session with the endpoint, so flushed data is
+    visible to the import query without a full commit.
+    """
+    paper = Paper(
+        id=uuid.uuid4(),
+        source="arxiv",
+        source_id=f"import-{uuid.uuid4().hex[:8]}",
+        title="Transformer Paper",
+        doi="10.48550/arXiv.1706.03762",
+        year=2017,
+    )
+    db_session.add(paper)
+    bm = Bookmark(user_id=user.id, paper_id=paper.id)
+    db_session.add(bm)
+    await db_session.flush()
+
+    # 첫 번째 import → imported=1 (참고문헌 생성됨)
+    resp1 = await authed_db_client.post("/api/references/import/bookmarks")
+    assert resp1.status_code == 200
+    assert resp1.json()["imported"] == 1
+    assert resp1.json()["skipped"] == 0
+
+    # 두 번째 import → skipped=1 (같은 doi 이미 존재)
+    resp2 = await authed_db_client.post("/api/references/import/bookmarks")
+    assert resp2.status_code == 200
+    assert resp2.json()["imported"] == 0
+    assert resp2.json()["skipped"] == 1
