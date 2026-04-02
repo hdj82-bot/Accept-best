@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import UserMenu from "@/components/UserMenu";
@@ -29,9 +30,9 @@ export default async function DashboardPage() {
 
         <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
           <DashboardCard
-            title="논문 수집"
+            title="논문 검색"
             description="arXiv·Semantic Scholar에서 논문을 검색하고 수집합니다."
-            disabled
+            href="/papers"
           />
           <DashboardCard
             title="설문문항 생성"
@@ -57,20 +58,16 @@ export default async function DashboardPage() {
 function DashboardCard({
   title,
   description,
+  href,
   disabled,
 }: {
   title: string;
   description: string;
+  href?: string;
   disabled?: boolean;
 }) {
-  return (
-    <div
-      className={`rounded-xl border p-5 ${
-        disabled
-          ? "border-zinc-200 bg-zinc-100/50 opacity-60 dark:border-zinc-800 dark:bg-zinc-900/50"
-          : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
-      }`}
-    >
+  const content = (
+    <>
       <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
         {title}
       </h3>
@@ -82,6 +79,22 @@ function DashboardCard({
           Coming Soon
         </span>
       )}
-    </div>
+    </>
   );
+
+  const className = `rounded-xl border p-5 ${
+    disabled
+      ? "border-zinc-200 bg-zinc-100/50 opacity-60 dark:border-zinc-800 dark:bg-zinc-900/50"
+      : "border-zinc-200 bg-white transition-all hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+  }`;
+
+  if (href && !disabled) {
+    return (
+      <Link href={href} className={`block ${className}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
