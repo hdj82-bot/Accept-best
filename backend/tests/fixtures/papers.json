@@ -1,0 +1,82 @@
+[
+  {
+    "source": "arxiv",
+    "source_id": "2301.00001",
+    "title": "Advances in Large Language Models for Academic Writing",
+    "abstract": "This paper surveys recent advances in large language models (LLMs) applied to academic writing assistance, covering summarization, question generation, and citation recommendation.",
+    "authors": ["Kim, Jisoo", "Park, Hyunjin"],
+    "keywords": ["LLM", "academic writing", "NLP"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000001",
+    "title": "Survey Question Generation from Scientific Literature",
+    "abstract": "We propose a transformer-based approach to automatically generate survey questionnaire items from research papers, enabling rapid instrument development for social-science researchers.",
+    "authors": ["Lee, Minjae", "Cho, Yuna"],
+    "keywords": ["survey generation", "questionnaire", "transformer"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2302.00002",
+    "title": "Semantic Similarity Search with pgvector",
+    "abstract": "pgvector enables efficient approximate nearest-neighbour search over high-dimensional embeddings inside PostgreSQL, making it suitable for RAG pipelines.",
+    "authors": ["Ahn, Seungho"],
+    "keywords": ["pgvector", "vector database", "RAG"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2303.00003",
+    "title": "OpenAI text-embedding-3 Evaluation",
+    "abstract": "A benchmark evaluation of OpenAI's text-embedding-3-small and text-embedding-3-large models on MTEB, showing strong multilingual performance.",
+    "authors": ["Yoon, Chaeyoung", "Shin, Hyunsik"],
+    "keywords": ["embeddings", "MTEB", "OpenAI"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000002",
+    "title": "Celery Task Queue Best Practices",
+    "abstract": "This paper reviews best practices for distributed task queues with Celery, including queue isolation, retry strategies, and monitoring with Flower.",
+    "authors": ["Jung, Taehoon"],
+    "keywords": ["Celery", "task queue", "distributed systems"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2304.00004",
+    "title": "FastAPI for Scientific Backends",
+    "abstract": "FastAPI's async-first design and automatic OpenAPI generation make it well-suited for data-intensive scientific web APIs.",
+    "authors": ["Kang, Boram", "Im, Sohee"],
+    "keywords": ["FastAPI", "async", "REST API"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000003",
+    "title": "Research Paper Version Control",
+    "abstract": "We present a lightweight version-control scheme for academic manuscripts that differentiates auto-saves from manual checkpoints to reduce cognitive overhead.",
+    "authors": ["Song, Minji"],
+    "keywords": ["version control", "academic writing", "auto-save"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2305.00005",
+    "title": "Korean Academic NLP Resources",
+    "abstract": "A curated list of NLP corpora and pre-trained models for Korean academic text, including abstracts from RISS and KISS databases.",
+    "authors": ["Lim, Daeho", "Oh, Soohyun"],
+    "keywords": ["Korean NLP", "academic corpus", "RISS"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000004",
+    "title": "Google OAuth Integration in Web Applications",
+    "abstract": "A practical guide to integrating Google OAuth 2.0 with Next.js and FastAPI, covering token exchange, JWT validation, and refresh token management.",
+    "authors": ["Bae, Kyunghee"],
+    "keywords": ["OAuth", "JWT", "Next.js", "FastAPI"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2306.00006",
+    "title": "Claude API for Structured Text Generation",
+    "abstract": "Anthropic's Claude API provides reliable structured outputs for long-form text generation tasks including summarization, rewriting, and question answering over scientific documents.",
+    "authors": ["Choi, Jungwon", "Han, Seyeon"],
+    "keywords": ["Claude", "Anthropic", "structured generation", "summarization"]
+  }
+]
