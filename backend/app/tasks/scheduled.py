@@ -101,3 +101,34 @@ def cleanup_old_auto_versions() -> dict:
 
     logger.info("cleanup_old_auto_versions: deleted %d old auto versions", deleted_total)
     return {"deleted": deleted_total}
+
+
+@celery_app.task(name="app.tasks.scheduled.notify_expiring_plans")
+def notify_expiring_plans() -> dict:
+    """
+    3일 내 만료 예정 유저를 조회하고 send_plan_expiry_warning 태스크를 호출.
+    Beat schedule: 매일 09:00 UTC
+    """
+    logger.info("notify_expiring_plans: checking for plans expiring within 3 days")
+
+    with _SessionLocal() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT id FROM users
+                WHERE plan != 'free'
+                  AND plan_expires_at IS NOT NULL
+                  AND plan_expires_at BETWEEN now() AND now() + INTERVAL '3 days'
+                """
+            )
+        ).fetchall()
+
+    from app.tasks.notify import send_plan_expiry_warning  # noqa: PLC0415
+
+    dispatched = 0
+    for (user_id,) in rows:
+        send_plan_expiry_warning.delay(str(user_id))
+        dispatched += 1
+
+    logger.info("notify_expiring_plans: dispatched %d warning emails", dispatched)
+    return {"dispatched": dispatched}

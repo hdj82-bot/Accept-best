@@ -7,6 +7,9 @@ from app.api.survey import router as survey_router
 from app.api.export import router as export_router
 from app.api.billing import router as billing_router
 from app.api.admin import router as admin_router
+from app.api.bookmarks import router as bookmarks_router
+from app.api.share import router as share_router
+from app.api.meta import router as meta_router
 
 __all__ = [
     "health_router",
@@ -18,4 +21,7 @@ __all__ = [
     "export_router",
     "billing_router",
     "admin_router",
+    "bookmarks_router",
+    "share_router",
+    "meta_router",
 ]

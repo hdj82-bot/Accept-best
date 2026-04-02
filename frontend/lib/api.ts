@@ -142,16 +142,26 @@ export interface SearchFilters {
   source?: "all" | "arxiv" | "semantic_scholar";
 }
 
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
 /**
  * POST /papers/search
- * Returns papers sorted by similarity score descending.
+ * Returns paginated papers sorted by similarity score descending.
  */
 export async function searchPapers(
   query: string,
   filters?: SearchFilters,
+  page = 1,
+  limit = 10,
   token?: string,
-): Promise<Paper[]> {
-  const body: Record<string, unknown> = { query };
+): Promise<PaginatedResult<Paper>> {
+  const body: Record<string, unknown> = { query, page, limit };
   if (filters?.year_from) body.year_from = filters.year_from;
   if (filters?.year_to)   body.year_to   = filters.year_to;
   if (filters?.source && filters.source !== "all") body.source = filters.source;
@@ -473,4 +483,346 @@ export async function getAdminUsers(token?: string): Promise<AdminUser[]> {
 /** DELETE /admin/users/:id */
 export async function deleteAdminUser(id: string, token?: string): Promise<void> {
   await fetchWithAuth(`/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Bookmarks
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface Bookmark {
+  id: string;
+  user_id: string;
+  paper_id: string;
+  paper: Paper;
+  created_at: string;
+}
+
+/** GET /bookmarks/ */
+export async function getBookmarks(token?: string): Promise<Bookmark[]> {
+  const res = await fetchWithAuth("/bookmarks/", {}, token);
+  return res.json();
+}
+
+/** POST /bookmarks/ */
+export async function addBookmark(paperId: string, token?: string): Promise<Bookmark> {
+  const res = await fetchWithAuth(
+    "/bookmarks/",
+    { method: "POST", body: JSON.stringify({ paper_id: paperId }) },
+    token,
+  );
+  return res.json();
+}
+
+/** DELETE /bookmarks/:paperId */
+export async function removeBookmark(paperId: string, token?: string): Promise<void> {
+  await fetchWithAuth(
+    `/bookmarks/${encodeURIComponent(paperId)}`,
+    { method: "DELETE" },
+    token,
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Search history
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface SearchHistoryItem {
+  id: string;
+  query: string;
+  created_at: string;
+}
+
+/** GET /search/history */
+export async function getSearchHistory(token?: string): Promise<SearchHistoryItem[]> {
+  const res = await fetchWithAuth("/search/history", {}, token);
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Payment (PortOne / 아임포트)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface PreparePaymentResponse {
+  merchant_uid: string;
+  amount: number;
+}
+
+export interface CompletePaymentResponse {
+  success: boolean;
+  plan: Plan;
+  expires_at: string;
+  message: string;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  merchant_uid: string;
+  imp_uid: string;
+  amount: number;
+  plan: Plan;
+  status: "paid" | "failed" | "cancelled";
+  created_at: string;
+}
+
+/** POST /payment/prepare */
+export async function preparePayment(
+  plan: Plan,
+  months: number,
+  token?: string,
+): Promise<PreparePaymentResponse> {
+  const res = await fetchWithAuth(
+    "/payment/prepare",
+    { method: "POST", body: JSON.stringify({ plan, months }) },
+    token,
+  );
+  return res.json();
+}
+
+/** POST /payment/complete */
+export async function completePayment(
+  imp_uid: string,
+  merchant_uid: string,
+  token?: string,
+): Promise<CompletePaymentResponse> {
+  const res = await fetchWithAuth(
+    "/payment/complete",
+    { method: "POST", body: JSON.stringify({ imp_uid, merchant_uid }) },
+    token,
+  );
+  return res.json();
+}
+
+/** GET /payment/history */
+export async function getPaymentHistory(token?: string): Promise<PaymentHistoryItem[]> {
+  const res = await fetchWithAuth("/payment/history", {}, token);
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Collections
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface Collection {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;          // hex color e.g. "#4F46E5"
+  paper_count: number;
+  created_at: string;
+}
+
+export interface CreateCollectionData {
+  name: string;
+  color: string;
+}
+
+/** GET /collections/ */
+export async function getCollections(token?: string): Promise<Collection[]> {
+  const res = await fetchWithAuth("/collections/", {}, token);
+  return res.json();
+}
+
+/** POST /collections/ */
+export async function createCollection(
+  data: CreateCollectionData,
+  token?: string,
+): Promise<Collection> {
+  const res = await fetchWithAuth(
+    "/collections/",
+    { method: "POST", body: JSON.stringify(data) },
+    token,
+  );
+  return res.json();
+}
+
+/** DELETE /collections/:id */
+export async function deleteCollection(id: string, token?: string): Promise<void> {
+  await fetchWithAuth(`/collections/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
+}
+
+/** POST /collections/:collectionId/papers/:paperId */
+export async function addPaperToCollection(
+  collectionId: string,
+  paperId: string,
+  token?: string,
+): Promise<void> {
+  await fetchWithAuth(
+    `/collections/${encodeURIComponent(collectionId)}/papers/${encodeURIComponent(paperId)}`,
+    { method: "POST" },
+    token,
+  );
+}
+
+/** DELETE /collections/:collectionId/papers/:paperId */
+export async function removePaperFromCollection(
+  collectionId: string,
+  paperId: string,
+  token?: string,
+): Promise<void> {
+  await fetchWithAuth(
+    `/collections/${encodeURIComponent(collectionId)}/papers/${encodeURIComponent(paperId)}`,
+    { method: "DELETE" },
+    token,
+  );
+}
+
+/** GET /collections/:collectionId/papers */
+export async function getCollectionPapers(
+  collectionId: string,
+  token?: string,
+): Promise<Paper[]> {
+  const res = await fetchWithAuth(
+    `/collections/${encodeURIComponent(collectionId)}/papers`,
+    {},
+    token,
+  );
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tags
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface PaperTag {
+  id: string;
+  paper_id: string;
+  user_id: string;
+  tag: string;
+  created_at: string;
+}
+
+export interface TagWithCount {
+  tag: string;
+  count: number;
+}
+
+/** GET /tags/ — all tags used by this user with counts */
+export async function getTags(token?: string): Promise<TagWithCount[]> {
+  const res = await fetchWithAuth("/tags/", {}, token);
+  return res.json();
+}
+
+/** GET /tags/:tag/papers */
+export async function getPapersByTag(tag: string, token?: string): Promise<Paper[]> {
+  const res = await fetchWithAuth(`/tags/${encodeURIComponent(tag)}/papers`, {}, token);
+  return res.json();
+}
+
+/** POST /tags/ */
+export async function addTag(
+  paperId: string,
+  tag: string,
+  token?: string,
+): Promise<PaperTag> {
+  const res = await fetchWithAuth(
+    "/tags/",
+    { method: "POST", body: JSON.stringify({ paper_id: paperId, tag }) },
+    token,
+  );
+  return res.json();
+}
+
+/** DELETE /tags/:paperId/:tag */
+export async function removeTag(
+  paperId: string,
+  tag: string,
+  token?: string,
+): Promise<void> {
+  await fetchWithAuth(
+    `/tags/${encodeURIComponent(paperId)}/${encodeURIComponent(tag)}`,
+    { method: "DELETE" },
+    token,
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// OG meta (server-side fetch for generateMetadata)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface OgMeta {
+  title: string | null;
+  description: string | null;
+  owner_name: string | null;
+  created_at: string;
+}
+
+/**
+ * GET /meta/og/:token — public, no auth.
+ * Called server-side in generateMetadata; uses plain fetch.
+ */
+export async function getOgMeta(shareToken: string): Promise<OgMeta> {
+  const url = `${BASE_URL}/meta/og/${encodeURIComponent(shareToken)}`;
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    next: { revalidate: 3600 },   // cache for 1 hour (Next.js fetch cache)
+  });
+  if (!res.ok) throw new Error(`OG meta fetch failed: ${res.status}`);
+  return res.json();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Share tokens
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface ShareToken {
+  id: string;
+  token: string;
+  note_id: string;
+  expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface SharedNote {
+  note: ResearchNote;
+  papers: Paper[];
+  owner_name: string | null;
+  share_token: ShareToken;
+}
+
+/** POST /share/ — create a share token for a note */
+export async function createShareToken(
+  noteId: string,
+  expiresInDays?: number,
+  token?: string,
+): Promise<ShareToken> {
+  const body: Record<string, unknown> = { note_id: noteId };
+  if (expiresInDays !== undefined) body.expires_in_days = expiresInDays;
+  const res = await fetchWithAuth(
+    "/share/",
+    { method: "POST", body: JSON.stringify(body) },
+    token,
+  );
+  return res.json();
+}
+
+/**
+ * GET /share/:token — public endpoint, no auth required.
+ * Uses plain fetch to avoid requiring a session.
+ */
+export async function getSharedNote(shareToken: string): Promise<SharedNote> {
+  const url = `${BASE_URL}/share/${encodeURIComponent(shareToken)}`;
+  const res = await fetch(url, { headers: { "Content-Type": "application/json" } });
+  if (!res.ok) {
+    let code = "UNKNOWN";
+    let message = res.statusText;
+    try {
+      const body = await res.clone().json();
+      code = body.error ?? code;
+      message = body.message ?? message;
+    } catch { /* ignore */ }
+    throw new ApiError(res.status, code, message);
+  }
+  return res.json();
+}
+
+/** DELETE /share/:token — revoke a share token */
+export async function revokeShareToken(shareToken: string, token?: string): Promise<void> {
+  await fetchWithAuth(`/share/${encodeURIComponent(shareToken)}`, { method: "DELETE" }, token);
+}
+
+/** GET /share/ — list the current user's share tokens */
+export async function getMyShareTokens(token?: string): Promise<ShareToken[]> {
+  const res = await fetchWithAuth("/share/", {}, token);
+  return res.json();
 }

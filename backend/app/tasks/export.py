@@ -107,6 +107,8 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
     use_fixtures = os.getenv("USE_FIXTURES", "false").lower() in ("1", "true", "yes")
     if use_fixtures:
         export_jobs_total.labels(format="markdown", status="success").inc()
+        from app.tasks.notify import send_research_complete  # noqa: PLC0415
+        send_research_complete.delay(user_id, note_id, "fixtures://markdown")
         return markdown_str
 
     # Upload to S3 and return presigned URL
@@ -133,6 +135,8 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
         ExpiresIn=3600,
     )
     export_jobs_total.labels(format="markdown", status="success").inc()
+    from app.tasks.notify import send_research_complete  # noqa: PLC0415
+    send_research_complete.delay(user_id, note_id, url)
     return url
 
 

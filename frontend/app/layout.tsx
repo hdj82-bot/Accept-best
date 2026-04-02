@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import GlobalNav from "@/components/GlobalNav";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,6 +20,21 @@ export const metadata: Metadata = {
   description: "Research Writing Assistant for Korean academics",
 };
 
+/**
+ * Inline script injected into <head> to prevent theme flash (FOUC).
+ * Runs before any CSS or React hydration — reads localStorage and
+ * sets the `dark` class on <html> immediately.
+ */
+const themeInitScript = `
+(function(){
+  try {
+    var t = localStorage.getItem('theme');
+    var dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (dark) document.documentElement.classList.add('dark');
+  } catch(e) {}
+})();
+`.trim();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,9 +44,19 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
-        <SessionProvider>{children}</SessionProvider>
+      <head>
+        {/* Theme init — must run before paint to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="min-h-full flex flex-col bg-[--background] text-[--foreground]">
+        <SessionProvider>
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+          <GlobalNav />
+        </SessionProvider>
       </body>
     </html>
   );

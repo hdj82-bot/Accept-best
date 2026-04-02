@@ -118,6 +118,44 @@ def embed_paper(paper_id: str) -> dict:
 
 
 @celery_app.task(
+    name="app.tasks.process.rerank_search_results",
+    queue="process",
+)
+def rerank_search_results(query: str, paper_ids: list[str]) -> list[dict]:
+    """Fetch papers by IDs, rerank by relevance to *query* via Claude Haiku."""
+    logger.info("rerank_search_results: query=%r, paper_ids=%s", query, paper_ids)
+
+    async def _run():
+        from app.models.papers import Paper
+
+        if not paper_ids:
+            return []
+
+        async with _SessionLocal() as session:
+            result = await session.execute(
+                select(Paper).where(Paper.id.in_(paper_ids))
+            )
+            db_papers = result.scalars().all()
+
+        papers_as_dicts = [
+            {
+                "id": str(p.id),
+                "title": p.title,
+                "abstract": p.abstract,
+                "year": p.year,
+                "source": p.source,
+            }
+            for p in db_papers
+        ]
+
+        from app.services import rerank_service  # noqa: PLC0415
+
+        return await rerank_service.rerank_papers(query, papers_as_dicts)
+
+    return _run_async(_run())
+
+
+@celery_app.task(
     name="app.tasks.process.generate_survey_questions",
     queue="process",
     max_retries=3,

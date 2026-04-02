@@ -5,6 +5,8 @@ from .papers import Paper
 from .survey_questions import SurveyQuestion
 from .paper_versions import PaperVersion
 from .research_notes import ResearchNote
+from .bookmark import Bookmark
+from .search_history import SearchHistory
 
 __all__ = [
     "Base",
@@ -14,4 +16,6 @@ __all__ = [
     "SurveyQuestion",
     "PaperVersion",
     "ResearchNote",
+    "Bookmark",
+    "SearchHistory",
 ]

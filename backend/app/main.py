@@ -13,7 +13,8 @@ from app.core.exceptions import AppError
 from app.api import (
     health_router, users_router, research_router, papers_router,
     versions_router, survey_router, export_router,
-    billing_router, admin_router, bookmarks_router,
+    billing_router, admin_router, bookmarks_router, share_router,
+    meta_router,
 )
 
 settings = get_settings()
@@ -69,6 +70,8 @@ app.include_router(export_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
+app.include_router(share_router, prefix="/api")
+app.include_router(meta_router, prefix="/api")
 
 
 # ── Prometheus metrics ─────────────────────────────────────────────────────────

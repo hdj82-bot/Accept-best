@@ -25,6 +25,7 @@ from app.schemas.survey_questions import SurveyQuestionRead
 from app.services import paper_service
 from app.services.embedding_service import get_embedding
 from app.services import search_service
+from app.services import rerank_service
 
 router = APIRouter()
 settings = get_settings()
@@ -40,6 +41,7 @@ class SearchBody(BaseModel):
     year_to: Optional[int] = None
     source: Optional[str] = None  # 'arxiv' | 'semantic_scholar'
     hybrid: bool = True
+    rerank: bool = False
 
 
 class CollectBody(BaseModel):
@@ -47,21 +49,37 @@ class CollectBody(BaseModel):
     source: str
 
 
-@router.post("/papers/search", response_model=List[PaperSearchRead])
+class PaperSearchRerankRead(PaperSearchRead):
+    rerank_score: Optional[float] = None
+    rerank_reason: Optional[str] = None
+
+
+@router.post("/papers/search")
 async def search_papers(
     body: SearchBody,
     user_id: Optional[str] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # ── rerank plan gate ──────────────────────────────────────────────────────
+    if body.rerank:
+        if not user_id:
+            raise HTTPException(status_code=403, detail="rerank 기능은 pro 플랜 전용입니다")
+        from app.services.user_service import get_user_by_id  # noqa: PLC0415
+        current_user = await get_user_by_id(user_id, db)
+        if not current_user or current_user.plan != "pro":
+            raise HTTPException(status_code=403, detail="rerank 기능은 pro 플랜 전용입니다")
+
     paper_search_total.labels(source=body.source or "all").inc()
     embedding = get_embedding(body.query)
+
+    search_limit = 20 if body.rerank else 10
 
     if body.hybrid:
         raw_results = await search_service.search_papers_hybrid(
             query=body.query,
             query_embedding=embedding,
             db=db,
-            limit=10,
+            limit=search_limit,
             year_from=body.year_from,
             year_to=body.year_to,
             source=body.source,
@@ -73,12 +91,40 @@ async def search_papers(
         papers = await search_service.search_papers_filtered(
             embedding,
             db,
-            limit=10,
+            limit=search_limit,
             year_from=body.year_from,
             year_to=body.year_to,
             source=body.source,
             query_text=body.query,
         )
+
+    # ── rerank via Claude Haiku ───────────────────────────────────────────────
+    rerank_scores: dict[str, tuple[float, str]] = {}
+    if body.rerank and papers:
+        candidates_as_dicts = [
+            {
+                "id": str(p.id),
+                "title": p.title,
+                "abstract": p.abstract,
+                "year": p.year,
+                "source": p.source,
+            }
+            for p in papers
+        ]
+        reranked = await rerank_service.rerank_papers(
+            query=body.query,
+            papers=candidates_as_dicts,
+            top_k=10,
+        )
+        # Build score map and reorder papers according to reranked order
+        rerank_scores = {
+            r["id"]: (r.get("rerank_score", 0.0), r.get("rerank_reason", ""))
+            for r in reranked
+        }
+        # Reorder papers to match reranked order
+        reranked_ids = [r["id"] for r in reranked]
+        paper_map = {str(p.id): p for p in papers}
+        papers = [paper_map[pid] for pid in reranked_ids if pid in paper_map]
 
     # ── is_bookmarked 필드 ────────────────────────────────────────────────────
     bookmarked_ids: set[uuid.UUID] = set()
@@ -94,7 +140,13 @@ async def search_papers(
 
     results = []
     for p in papers:
-        data = PaperSearchRead.model_validate(p)
+        if body.rerank:
+            data = PaperSearchRerankRead.model_validate(p)
+            pid_str = str(p.id)
+            if pid_str in rerank_scores:
+                data.rerank_score, data.rerank_reason = rerank_scores[pid_str]
+        else:
+            data = PaperSearchRead.model_validate(p)
         data.is_bookmarked = p.id in bookmarked_ids
         results.append(data)
 

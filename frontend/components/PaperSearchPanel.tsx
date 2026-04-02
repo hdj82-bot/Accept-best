@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { searchPapers, type Paper, type SearchFilters } from "@/lib/api";
+import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  searchPapers,
+  getSearchHistory,
+  type Paper,
+  type SearchFilters,
+  type SearchHistoryItem,
+} from "@/lib/api";
+import BookmarkButton from "@/components/BookmarkButton";
+import Pagination from "@/components/Pagination";
 
 interface PaperSearchPanelProps {
   /** Called when the user selects a paper to add to the current note */
@@ -35,9 +43,10 @@ function SkeletonCard() {
 interface PaperCardProps {
   paper: Paper;
   onClick: () => void;
+  isBookmarked?: boolean;
 }
 
-function PaperCard({ paper, onClick }: PaperCardProps) {
+function PaperCard({ paper, onClick, isBookmarked = false }: PaperCardProps) {
   const score = paper.similarity_score;
   const scoreColor =
     score === null ? "text-slate-400"
@@ -46,11 +55,17 @@ function PaperCard({ paper, onClick }: PaperCardProps) {
       : "text-slate-500";
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-    >
-      <div className="mb-1 flex items-start justify-between gap-2">
+    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-blue-300 hover:shadow-md">
+      {/* Bookmark button — top-right, above the click area */}
+      <div className="absolute right-2 top-2 z-10">
+        <BookmarkButton paperId={paper.id} isBookmarked={isBookmarked} size="sm" />
+      </div>
+
+      <button
+        onClick={onClick}
+        className="w-full p-4 text-left"
+      >
+      <div className="mb-1 flex items-start justify-between gap-2 pr-7">
         <h3 className="text-sm font-semibold leading-snug text-slate-800 line-clamp-2">
           {paper.title}
         </h3>
@@ -72,7 +87,8 @@ function PaperCard({ paper, onClick }: PaperCardProps) {
           {paper.abstract}
         </p>
       )}
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -254,10 +270,11 @@ function FilterPanel({ filters, onChange }: FilterPanelProps) {
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Paper search panel with results list, filter toggle, and slide-over detail.
+ * Paper search panel with history dropdown, filter toggle, bookmark buttons,
+ * paginated results, and slide-over detail view.
  *
  * Props:
- *   onSelectPaper  — callback when user clicks "노트에 추가" in the detail panel
+ *   onSelectPaper  — callback when user clicks "노트에 추가"
  *   initialQuery   — pre-fills and auto-runs the first search
  */
 export default function PaperSearchPanel({
@@ -268,25 +285,57 @@ export default function PaperSearchPanel({
   const [filters, setFilters] = useState<SearchFilters>({ source: "all" });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [results, setResults] = useState<Paper[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const runSearch = async (q: string, f: SearchFilters = filters) => {
+  // History dropdown
+  const [history, setHistory] = useState<SearchHistoryItem[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+
+  // Close history dropdown on outside click or Escape
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setHistoryOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHistoryOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
+
+  const runSearch = useCallback(async (
+    q: string,
+    f: SearchFilters = filters,
+    p = 1,
+  ) => {
     const trimmed = q.trim();
     if (!trimmed) return;
     setLoading(true);
     setError(null);
+    setHistoryOpen(false);
     try {
-      const papers = await searchPapers(trimmed, f);
-      setResults(papers);
+      const result = await searchPapers(trimmed, f, p);
+      setResults(result.items);
+      setPage(result.page);
+      setTotalPages(result.total_pages);
     } catch (err) {
       setError(err instanceof Error ? err.message : "검색 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   // Auto-run if initialQuery supplied
   useEffect(() => {
@@ -294,15 +343,39 @@ export default function PaperSearchPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    runSearch(query);
+  const handleFocus = async () => {
+    if (history.length === 0) {
+      try {
+        const h = await getSearchHistory();
+        setHistory(h.slice(0, 5));
+      } catch { /* ignore */ }
+    }
+    if (history.length > 0 || !query) setHistoryOpen(true);
   };
 
-  // Re-run search when filter changes (only if there's an active query)
+  // Show dropdown whenever we have history and input is focused
+  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+    if (history.length > 0) setHistoryOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runSearch(query, filters, 1);
+  };
+
+  const handleHistoryClick = (q: string) => {
+    setQuery(q);
+    runSearch(q, filters, 1);
+  };
+
   const handleFilterChange = (f: SearchFilters) => {
     setFilters(f);
-    if (query.trim()) runSearch(query, f);
+    if (query.trim()) runSearch(query, f, 1);
+  };
+
+  const handlePageChange = (p: number) => {
+    runSearch(query, filters, p);
   };
 
   const hasActiveFilters =
@@ -310,23 +383,46 @@ export default function PaperSearchPanel({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Search bar */}
-      <form onSubmit={handleSubmit} className="mb-2 flex gap-2">
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="논문 키워드·제목 검색…"
-          className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-        />
-        <button
-          type="submit"
-          disabled={loading || !query.trim()}
-          className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-        >
-          검색
-        </button>
-      </form>
+      {/* Search bar + history dropdown */}
+      <div ref={historyRef} className="relative mb-2">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={handleQueryChange}
+            onFocus={handleFocus}
+            placeholder="논문 키워드·제목 검색…"
+            autoComplete="off"
+            className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+          >
+            검색
+          </button>
+        </form>
+
+        {/* History dropdown */}
+        {historyOpen && history.length > 0 && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              최근 검색어
+            </p>
+            {history.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleHistoryClick(item.query)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <span className="text-slate-400">🕐</span>
+                {item.query}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Filter toggle */}
       <button
@@ -371,6 +467,15 @@ export default function PaperSearchPanel({
                 검색 결과가 없습니다.
               </p>
             )}
+
+        {/* Pagination */}
+        {!loading && results.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        )}
       </div>
 
       {/* Detail slide panel */}

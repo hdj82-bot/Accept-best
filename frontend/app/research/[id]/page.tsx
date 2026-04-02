@@ -10,6 +10,7 @@ import ResearchEditor, {
 } from "@/components/ResearchEditor";
 import VersionHistory from "@/components/VersionHistory";
 import ExportButton from "@/components/ExportButton";
+import ShareButton from "@/components/ShareButton";
 import { getNote, updateNote, type Paper, type ResearchNote } from "@/lib/api";
 
 export default function ResearchDetailPage() {
@@ -129,6 +130,9 @@ function ResearchDetailContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Share button */}
+            {id && <ShareButton noteId={id} />}
+
             {/* Export button */}
             {id && <ExportButton noteId={id} />}
 

@@ -6,7 +6,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import UsageIndicator from "@/components/UsageIndicator";
-import { getMe, getNotes, type User, type ResearchNote } from "@/lib/api";
+import {
+  getMe,
+  getNotes,
+  getSearchHistory,
+  type User,
+  type ResearchNote,
+  type SearchHistoryItem,
+} from "@/lib/api";
 
 export default function DashboardPage() {
   return (
@@ -22,13 +29,17 @@ function DashboardContent() {
   const [user, setUser] = useState<User | null>(null);
   const [notes, setNotes] = useState<ResearchNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(true);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
 
   useEffect(() => {
     getMe().then(setUser).catch(() => null);
     getNotes()
-      .then((n) => setNotes(n.slice(0, 5)))   // show 5 most recent
+      .then((n) => setNotes(n.slice(0, 5)))
       .catch(() => null)
       .finally(() => setNotesLoading(false));
+    getSearchHistory()
+      .then((h) => setSearchHistory(h.slice(0, 3)))
+      .catch(() => null);
   }, []);
 
   return (
@@ -133,6 +144,39 @@ function DashboardContent() {
           <div className="space-y-6">
             <UsageIndicator plan={user?.plan ?? "free"} />
 
+            {/* Recent searches widget */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-700">최근 검색어</p>
+                <Link
+                  href="/research"
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  더보기
+                </Link>
+              </div>
+              {searchHistory.length === 0 ? (
+                <p className="text-xs text-slate-400">검색 기록이 없습니다.</p>
+              ) : (
+                <div className="space-y-1">
+                  {searchHistory.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() =>
+                        router.push(
+                          `/research?q=${encodeURIComponent(item.query)}`,
+                        )
+                      }
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-50"
+                    >
+                      <span className="text-slate-400 text-xs">🕐</span>
+                      <span className="truncate">{item.query}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Quick links */}
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="mb-3 text-sm font-medium text-slate-700">바로가기</p>
@@ -157,9 +201,10 @@ function DashboardContent() {
 }
 
 const QUICK_LINKS = [
-  { href: "/research",  icon: "📄", label: "논문 수집 · 노트" },
-  { href: "/survey",    icon: "❓", label: "설문문항 생성" },
-  { href: "/checkup",  icon: "🔍", label: "논문 건강검진" },
-  { href: "/versions", icon: "📝", label: "논문 버전 관리" },
-  { href: "/refs",     icon: "📚", label: "참고문헌 관리" },
+  { href: "/research",   icon: "📄", label: "논문 수집 · 노트" },
+  { href: "/bookmarks",  icon: "🤍", label: "내 북마크" },
+  { href: "/survey",     icon: "❓", label: "설문문항 생성" },
+  { href: "/checkup",    icon: "🔍", label: "논문 건강검진" },
+  { href: "/versions",   icon: "📝", label: "논문 버전 관리" },
+  { href: "/refs",       icon: "📚", label: "참고문헌 관리" },
 ];

@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.tasks.process",
         "app.tasks.export",
         "app.tasks.scheduled",
+        "app.tasks.notify",
     ],
 )
 
@@ -43,5 +44,9 @@ celery_app.conf.beat_schedule = {
     "cleanup-versions-hourly": {
         "task": "app.tasks.scheduled.cleanup_old_auto_versions",
         "schedule": crontab(minute=0),
+    },
+    "notify-expiring-plans-daily": {
+        "task": "app.tasks.scheduled.notify_expiring_plans",
+        "schedule": crontab(hour=9, minute=0),  # 매일 09:00 UTC
     },
 }
