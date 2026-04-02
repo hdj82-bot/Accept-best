@@ -6,10 +6,11 @@ import { usePathname } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV_LINKS = [
-  { href: "/dashboard",  label: "홈",    icon: "🏠" },
-  { href: "/research",   label: "연구",  icon: "📄" },
-  { href: "/bookmarks",  label: "북마크", icon: "🤍" },
-  { href: "/billing",    label: "플랜",  icon: "💳" },
+  { href: "/dashboard",   label: "홈",     icon: "🏠" },
+  { href: "/research",    label: "연구",   icon: "📄" },
+  { href: "/bookmarks",   label: "북마크", icon: "🤍" },
+  { href: "/collections", label: "컬렉션", icon: "📁" },
+  { href: "/billing",     label: "플랜",   icon: "💳" },
 ];
 
 /**

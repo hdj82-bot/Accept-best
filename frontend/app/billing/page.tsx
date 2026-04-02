@@ -8,13 +8,29 @@ import {
   getMe,
   getCurrentBilling,
   getPlans,
-  upgradePlan,
   cancelPlan,
+  preparePayment,
+  completePayment,
   type User,
   type CurrentBilling,
   type BillingPlan,
   type Plan,
 } from "@/lib/api";
+
+// PortOne (아임포트) SDK type
+declare global {
+  interface Window {
+    IMP?: {
+      init: (merchantId: string) => void;
+      request_pay: (
+        params: Record<string, unknown>,
+        callback: (rsp: { success: boolean; imp_uid?: string; merchant_uid?: string; error_msg?: string }) => void
+      ) => void;
+    };
+  }
+}
+
+const IMP_MERCHANT_ID = process.env.NEXT_PUBLIC_IMP_MERCHANT_ID ?? "";
 
 export default function BillingPage() {
   return (
@@ -236,13 +252,65 @@ function BillingContent() {
   const handleUpgrade = async (plan: Plan) => {
     setUpgrading(true);
     try {
-      const res = await upgradePlan(plan, 1);
-      setUser((u) => u ? { ...u, plan } : u);
-      setBilling((b) => b ? { ...b, plan, expires_at: res.expires_at } : b);
-      showToast("플랜이 업그레이드되었습니다.", "success");
+      // Step 1 – prepare (creates merchant_uid + amount on server)
+      const { merchant_uid, amount } = await preparePayment(plan, 1);
+
+      // Step 2 – mock mode when USE_FIXTURES is set (dev only)
+      const useMock = process.env.NEXT_PUBLIC_USE_FIXTURES === "true";
+      if (useMock) {
+        const res = await completePayment("imp_mock_" + Date.now(), merchant_uid);
+        if (res.success) {
+          setUser((u) => u ? { ...u, plan } : u);
+          setBilling((b) => b ? { ...b, plan, expires_at: res.expires_at } : b);
+          showToast("플랜이 업그레이드되었습니다.", "success");
+        }
+        setUpgrading(false);
+        return;
+      }
+
+      // Step 3 – PortOne SDK
+      if (!window.IMP) {
+        showToast("결제 모듈을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "error");
+        setUpgrading(false);
+        return;
+      }
+      window.IMP.init(IMP_MERCHANT_ID);
+
+      const planLabels: Record<string, string> = { basic: "Basic", pro: "Pro" };
+      window.IMP.request_pay(
+        {
+          pg: "html5_inicis",
+          pay_method: "card",
+          merchant_uid,
+          amount,
+          name: `논문집필 도우미 ${planLabels[plan] ?? plan} 플랜`,
+          m_redirect_url: window.location.href,
+        },
+        async (rsp) => {
+          if (!rsp.success || !rsp.imp_uid || !rsp.merchant_uid) {
+            showToast(rsp.error_msg ?? "결제가 취소되었습니다.", "error");
+            setUpgrading(false);
+            return;
+          }
+          try {
+            // Step 4 – verify on server
+            const res = await completePayment(rsp.imp_uid, rsp.merchant_uid);
+            if (res.success) {
+              setUser((u) => u ? { ...u, plan } : u);
+              setBilling((b) => b ? { ...b, plan, expires_at: res.expires_at } : b);
+              showToast("플랜이 업그레이드되었습니다.", "success");
+            } else {
+              showToast("결제 검증에 실패했습니다.", "error");
+            }
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : "결제 검증 실패", "error");
+          } finally {
+            setUpgrading(false);
+          }
+        }
+      );
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "업그레이드 실패", "error");
-    } finally {
+      showToast(err instanceof Error ? err.message : "결제 준비 실패", "error");
       setUpgrading(false);
     }
   };

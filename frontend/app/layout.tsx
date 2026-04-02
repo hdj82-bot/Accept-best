@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { SessionProvider } from "next-auth/react";
 import GlobalNav from "@/components/GlobalNav";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -16,8 +17,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "논문집필 도우미",
-  description: "Research Writing Assistant for Korean academics",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://academi.ai"
+  ),
+  title: {
+    default: "논문집필 도우미",
+    template: "%s | 논문집필 도우미",
+  },
+  description: "AI 기반 논문 수집, 설문 생성, 버전 관리 — 한국 연구자를 위한 연구 작성 도우미",
+  openGraph: {
+    siteName: "논문집필 도우미",
+    type: "website",
+  },
 };
 
 /**
@@ -50,6 +61,11 @@ export default function RootLayout({
         {/* Theme init — must run before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
+      {/* PortOne (아임포트) SDK — loaded after page is interactive */}
+      <Script
+        src="https://cdn.iamport.kr/v1/iamport.js"
+        strategy="lazyOnload"
+      />
       <body className="min-h-full flex flex-col bg-[--background] text-[--foreground]">
         <SessionProvider>
           <ErrorBoundary>

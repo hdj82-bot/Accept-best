@@ -10,6 +10,7 @@ from app.api.admin import router as admin_router
 from app.api.bookmarks import router as bookmarks_router
 from app.api.share import router as share_router
 from app.api.meta import router as meta_router
+from app.api.payment import router as payment_router
 
 __all__ = [
     "health_router",
@@ -24,4 +25,5 @@ __all__ = [
     "bookmarks_router",
     "share_router",
     "meta_router",
+    "payment_router",
 ]
