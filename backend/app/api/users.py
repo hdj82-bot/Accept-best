@@ -39,7 +39,7 @@ async def update_me(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """프로필 수정 — 이메일 제외 (name, image, plan, plan_expires_at)."""
+    """프로필 수정 — name, image만 허용."""
     user = await get_user_by_id(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

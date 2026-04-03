@@ -7,6 +7,7 @@ When USE_FIXTURES=true the 10 seed papers from fixtures/papers.json are loaded.
 
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator
@@ -15,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+import jwt as pyjwt
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.main import app
@@ -171,9 +173,43 @@ def mock_anthropic_client():
 @pytest.fixture
 def mock_openai_embedding():
     """Mock OpenAI embedding client for embedding tasks."""
-    with patch("app.services.embedding_service._client") as mock_client:
-        fake_embedding = [0.0] * 1536
-        mock_resp = MagicMock()
-        mock_resp.data = [MagicMock(embedding=fake_embedding)]
-        mock_client.embeddings.create.return_value = mock_resp
+    fake_embedding = [0.0] * 1536
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.data = [MagicMock(embedding=fake_embedding)]
+    mock_client.embeddings.create.return_value = mock_resp
+    with patch("app.services.embedding_service._get_client", return_value=mock_client):
         yield mock_client
+
+
+# ── Auth fixtures ────────────────────────────────────────────────────────────
+
+_TEST_SECRET = os.getenv("NEXTAUTH_SECRET", "test-secret")
+
+
+@pytest_asyncio.fixture
+async def test_user(db_session: AsyncSession):
+    """Create a test user in the DB and return it."""
+    from app.models.users import User
+
+    user = User(
+        id=uuid.uuid4(),
+        email=f"pay_{uuid.uuid4().hex[:6]}@example.com",
+        provider="google",
+        plan="free",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    return user
+
+
+@pytest.fixture
+def auth_headers(test_user):
+    """Return HTTP Authorization headers with a valid JWT for test_user."""
+    payload = {
+        "sub": str(test_user.id),
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 3600,
+    }
+    token = pyjwt.encode(payload, _TEST_SECRET, algorithm="HS256")
+    return {"Authorization": f"Bearer {token}"}

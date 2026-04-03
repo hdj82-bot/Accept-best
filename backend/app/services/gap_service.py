@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
-import os
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.papers import Paper
 from app.models.research_notes import ResearchNote
+
+logger = logging.getLogger(__name__)
 
 FIXTURE_RESULT = {
     "summary": "수집된 논문 분석 결과, 다음 영역에서 연구 공백이 발견되었습니다.",
@@ -71,7 +74,8 @@ async def analyze_research_gap(
     )
     papers = list(papers_result.scalars().all())
 
-    if os.getenv("USE_FIXTURES", "false").lower() == "true" or not papers:
+    settings = get_settings()
+    if settings.use_fixtures or not papers:
         return {**FIXTURE_RESULT, "paper_count": len(papers)}
 
     # 논문 컨텍스트 구성
@@ -81,10 +85,14 @@ async def analyze_research_gap(
         context_parts.append(f"{i}. {p.title}\n   {abstract_snippet}")
     context = "\n\n".join(context_parts)
 
+    if not settings.anthropic_api_key:
+        logger.warning("ANTHROPIC_API_KEY not set — returning fixture for gap analysis")
+        return {**FIXTURE_RESULT, "paper_count": len(papers), "fixture": True}
+
     try:
         import anthropic
 
-        client = anthropic.AsyncAnthropic()
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         message = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1500,
@@ -109,5 +117,6 @@ async def analyze_research_gap(
         parsed = json.loads(text[start:end])
         parsed["paper_count"] = len(papers)
         return parsed
-    except Exception:
+    except Exception as exc:
+        logger.warning("gap analysis Claude call failed: %s", exc)
         return {**FIXTURE_RESULT, "paper_count": len(papers), "fixture": True}

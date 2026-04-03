@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.users import User
+from app.services import cache_service
 
 
 async def get_or_create_user(
@@ -46,7 +47,9 @@ async def get_or_create_user(
     )
     result = await db.execute(stmt)
     await db.commit()
-    return result.scalar_one()
+    user = result.scalar_one()
+    await cache_service.invalidate_user(str(user.id))
+    return user
 
 
 async def get_user_by_id(user_id: str, db: AsyncSession) -> Optional[User]:
@@ -55,6 +58,19 @@ async def get_user_by_id(user_id: str, db: AsyncSession) -> Optional[User]:
         select(User).where(User.id == uuid.UUID(user_id))
     )
     return result.scalar_one_or_none()
+
+
+async def get_user_plan_cached(user_id: str, db: AsyncSession) -> str:
+    """Return user plan, cached in Redis for 1 hour."""
+    cache_key = cache_service.user_plan_key(user_id)
+    cached = await cache_service.get(cache_key)
+    if cached is not None:
+        return cached.get("plan", "free")
+
+    user = await get_user_by_id(user_id, db)
+    plan = user.plan if user else "free"
+    await cache_service.set(cache_key, {"plan": plan}, ttl=cache_service.TTL_USER)
+    return plan
 
 
 async def update_plan(
@@ -71,4 +87,5 @@ async def update_plan(
     user.plan_expires_at = expires_at
     await db.commit()
     await db.refresh(user)
+    await cache_service.invalidate_user(user_id)
     return user

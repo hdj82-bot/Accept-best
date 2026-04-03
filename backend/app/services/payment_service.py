@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -10,12 +10,12 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.models.payment import Payment
 from app.services.billing_service import get_plan_price, upgrade_plan
 
-USE_FIXTURES = os.getenv("USE_FIXTURES", "false").lower() == "true"
+logger = logging.getLogger(__name__)
 
 PORTONE_API_BASE = "https://api.iamport.kr"
 
@@ -26,12 +26,16 @@ class PaymentVerificationError(AppError):
 
 
 async def _get_portone_token() -> str:
+    settings = get_settings()
+    if not settings.portone_api_key or not settings.portone_api_secret:
+        raise PaymentVerificationError("PortOne API 키가 설정되지 않았습니다.")
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"{PORTONE_API_BASE}/users/getToken",
             json={
-                "imp_key": settings.PORTONE_API_KEY,
-                "imp_secret": settings.PORTONE_API_SECRET,
+                "imp_key": settings.portone_api_key,
+                "imp_secret": settings.portone_api_secret,
             },
             timeout=10,
         )
@@ -80,7 +84,8 @@ async def verify_and_complete(
     if not payment:
         raise PaymentVerificationError("결제 내역을 찾을 수 없습니다.")
 
-    if USE_FIXTURES:
+    settings = get_settings()
+    if settings.use_fixtures:
         payment.portone_payment_id = portone_payment_id or merchant_uid
         payment.status = "paid"
         payment.paid_at = datetime.now(timezone.utc)
@@ -136,8 +141,12 @@ async def handle_webhook(data: dict, db: AsyncSession) -> dict:
 
 
 def verify_webhook_signature(body: bytes, signature: str) -> bool:
-    if USE_FIXTURES:
+    settings = get_settings()
+    if settings.use_fixtures:
         return True
-    secret = settings.PORTONE_WEBHOOK_SECRET.encode()
+    if not settings.portone_webhook_secret:
+        logger.warning("PORTONE_WEBHOOK_SECRET not set — rejecting webhook")
+        return False
+    secret = settings.portone_webhook_secret.encode()
     expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)

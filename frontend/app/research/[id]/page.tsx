@@ -1,17 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
-import PaperSearchPanel from "@/components/PaperSearchPanel";
-import SurveyPanel from "@/components/SurveyPanel";
 import ResearchEditor, {
   type ResearchEditorHandle,
 } from "@/components/ResearchEditor";
-import VersionHistory from "@/components/VersionHistory";
-import ExportButton from "@/components/ExportButton";
-import ShareButton from "@/components/ShareButton";
 import { getNote, updateNote, type Paper, type ResearchNote } from "@/lib/api";
+
+// ── Lazy-loaded components (reduce initial bundle ~40KB) ────────────────────
+const PaperSearchPanel = dynamic(() => import("@/components/PaperSearchPanel"), {
+  loading: () => <div className="h-40 animate-pulse rounded-xl bg-slate-100" />,
+});
+const SurveyPanel = dynamic(() => import("@/components/SurveyPanel"), {
+  loading: () => <div className="h-32 animate-pulse rounded-xl bg-slate-100" />,
+});
+const VersionHistory = dynamic(() => import("@/components/VersionHistory"), {
+  ssr: false,
+});
+const ExportButton = dynamic(() => import("@/components/ExportButton"), {
+  ssr: false,
+  loading: () => <div className="h-9 w-20 animate-pulse rounded-xl bg-slate-100" />,
+});
+const ShareButton = dynamic(() => import("@/components/ShareButton"), {
+  ssr: false,
+  loading: () => <div className="h-9 w-20 animate-pulse rounded-xl bg-slate-100" />,
+});
 
 export default function ResearchDetailPage() {
   return (
