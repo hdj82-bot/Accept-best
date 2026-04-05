@@ -4,6 +4,8 @@ import Script from "next/script";
 import { SessionProvider } from "next-auth/react";
 import GlobalNav from "@/components/GlobalNav";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import SkipLink from "@/components/SkipLink";
+import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -67,11 +69,16 @@ export default function RootLayout({
         strategy="lazyOnload"
       />
       <body className="min-h-full flex flex-col bg-[--background] text-[--foreground] pb-20 lg:pb-0">
+        <SkipLink />
         <SessionProvider>
-          <ErrorBoundary>
-            {children}
-          </ErrorBoundary>
-          <GlobalNav />
+          <ToastProvider>
+            <ErrorBoundary scope="root">
+              <div id="main-content" tabIndex={-1} className="flex-1 outline-none">
+                {children}
+              </div>
+            </ErrorBoundary>
+            <GlobalNav />
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>
