@@ -63,6 +63,8 @@ def _build_markdown(note, questions, papers) -> str:
     name="app.tasks.export.export_research_markdown",
     queue="export",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def export_research_markdown(note_id: str, user_id: str) -> str:
     logger.info("export_research_markdown: note_id=%s user_id=%s", note_id, user_id)
@@ -147,6 +149,8 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
     name="app.tasks.export.export_research_pdf",
     queue="export",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def export_research_pdf(note_id: str, user_id: str) -> str:
     logger.info("export_research_pdf: note_id=%s user_id=%s", note_id, user_id)
