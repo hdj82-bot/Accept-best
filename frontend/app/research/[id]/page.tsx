@@ -7,6 +7,8 @@ import AuthGuard from "@/components/AuthGuard";
 import ResearchEditor, {
   type ResearchEditorHandle,
 } from "@/components/ResearchEditor";
+import EmptyState from "@/components/EmptyState";
+import { Skeleton } from "@/components/Skeleton";
 import { getNote, updateNote, type Paper, type ResearchNote } from "@/lib/api";
 
 // ── Lazy-loaded components (reduce initial bundle ~40KB) ────────────────────
@@ -100,15 +102,15 @@ function ResearchDetailContent() {
   // ── Loading skeleton ──
   if (loading) {
     return (
-      <main className="flex h-screen flex-col bg-slate-50">
-        <div className="border-b border-slate-200 bg-white px-6 py-3">
-          <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
+      <main className="flex h-screen flex-col bg-slate-50 dark:bg-slate-950" role="status" aria-busy="true">
+        <div className="border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <Skeleton height={20} width={160} />
         </div>
         <div className="flex flex-1 gap-4 p-6">
-          <div className="w-72 animate-pulse rounded-2xl bg-slate-100" />
-          <div className="flex-1 animate-pulse rounded-2xl bg-slate-100" />
-          <div className="w-72 animate-pulse rounded-2xl bg-slate-100" />
+          <Skeleton className="w-72 flex-none" rounded="rounded-2xl" />
+          <Skeleton className="flex-1" rounded="rounded-2xl" />
         </div>
+        <span className="sr-only">연구 노트를 불러오는 중</span>
       </main>
     );
   }
@@ -116,16 +118,14 @@ function ResearchDetailContent() {
   // ── Error state ──
   if (fetchError && !note) {
     return (
-      <main className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <p className="text-slate-600">{fetchError}</p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="mt-4 text-sm text-blue-600 hover:underline"
-          >
-            대시보드로 돌아가기
-          </button>
-        </div>
+      <main className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-6">
+        <EmptyState
+          icon="⚠️"
+          tone="error"
+          title="노트를 불러오지 못했습니다"
+          description={fetchError}
+          action={{ label: "대시보드로 돌아가기", href: "/dashboard" }}
+        />
       </main>
     );
   }
