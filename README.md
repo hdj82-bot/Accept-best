@@ -1,6 +1,24 @@
 # 논문집필 도우미 (academi.ai)
 
+[![CI](https://github.com/hdj82-bot/academi.ai/actions/workflows/ci.yml/badge.svg)](https://github.com/hdj82-bot/academi.ai/actions/workflows/ci.yml)
+[![Deploy](https://github.com/hdj82-bot/academi.ai/actions/workflows/deploy.yml/badge.svg)](https://github.com/hdj82-bot/academi.ai/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen)](./backend/tests)
+
 AI 기반 논문 수집·설문·버전관리·건강검진 — 한국 연구자를 위한 올인원 플랫폼.
+
+![데모](./docs/screenshots/demo.gif)
+
+> 🚀 **빠른 둘러보기**: [사용자 가이드](./docs/user-guide.md) · [API 문서](./docs/api.md) · [보안 감사 체크리스트](./docs/security-audit.md) · [기여 가이드](./CONTRIBUTING.md)
+
+## 스크린샷
+
+| 대시보드 | 논문 검색 | 컬렉션 |
+| --- | --- | --- |
+| ![dashboard](./docs/screenshots/dashboard.png) | ![search](./docs/screenshots/search.png) | ![collections](./docs/screenshots/collections.png) |
 
 ## 기술 스택
 
@@ -112,6 +130,19 @@ docker compose exec backend pytest tests/ -v --tb=short
 
 현재 테스트 현황: **82개** (10개 파일)
 
+### E2E 테스트 (Playwright)
+
+```bash
+cd frontend
+npm run test:e2e
+```
+
+커버되는 흐름:
+- 인증 (Google/Kakao OAuth) — `e2e/auth.spec.ts`, `e2e/kakao-auth.spec.ts`
+- 결제 (PortOne SDK mock) — `e2e/payment-flow.spec.ts`
+- 논문 검색 → 컬렉션 추가 → Export 통합 플로우 — `e2e/full-flow.spec.ts`
+- 검색 · 연구 노트 자동저장 — `e2e/search.spec.ts`, `e2e/research.spec.ts`
+
 ## 프로젝트 구조
 
 ```
@@ -135,5 +166,21 @@ academi.ai/
 ├── docker-compose.yml
 ├── docker-compose.override.yml  # 개발 (hot reload + 모니터링)
 ├── docker-compose.prod.yml      # 프로덕션
+├── docs/                         # 사용자 가이드 · API · 보안 감사
+├── CONTRIBUTING.md
 └── Makefile
 ```
+
+## 법적 고지
+
+- [이용약관](./frontend/app/terms/page.tsx)
+- [개인정보처리방침](./frontend/app/privacy/page.tsx) (개인정보보호법 준수)
+- [환불정책](./frontend/app/refund/page.tsx) (전자상거래법 준수)
+
+## 기여하기
+
+버그 리포트, 기능 제안, 풀 리퀘스트 모두 환영합니다. 자세한 내용은 [CONTRIBUTING.md](./CONTRIBUTING.md)를 참고해주세요.
+
+## 라이선스
+
+MIT © academi.ai contributors
