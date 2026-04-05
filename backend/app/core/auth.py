@@ -3,11 +3,19 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.exceptions import UnauthorizedError, QuotaExceededError
 
 SECRET_KEY = os.getenv("NEXTAUTH_SECRET", "")
+if not SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "NEXTAUTH_SECRET is not set — JWT verification will fail. "
+        "Set it in .env or as an environment variable.",
+        stacklevel=1,
+    )
 ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
@@ -26,7 +34,7 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> str
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         return user_id
-    except JWTError:
+    except PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 

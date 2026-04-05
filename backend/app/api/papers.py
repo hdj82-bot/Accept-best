@@ -66,9 +66,9 @@ async def search_papers(
     if body.rerank:
         if not user_id:
             raise HTTPException(status_code=403, detail="rerank 기능은 pro 플랜 전용입니다")
-        from app.services.user_service import get_user_by_id  # noqa: PLC0415
-        current_user = await get_user_by_id(user_id, db)
-        if not current_user or current_user.plan != "pro":
+        from app.services.user_service import get_user_plan_cached  # noqa: PLC0415
+        plan = await get_user_plan_cached(user_id, db)
+        if plan != "pro":
             raise HTTPException(status_code=403, detail="rerank 기능은 pro 플랜 전용입니다")
 
     paper_search_total.labels(source=body.source or "all").inc()
@@ -271,7 +271,10 @@ async def get_paper(
 
 
 @router.post("/papers/collect")
-async def collect_papers(body: CollectBody):
+async def collect_papers(
+    body: CollectBody,
+    user_id: str = Depends(get_current_user),
+):
     from app.tasks.collect import collect_arxiv_papers, collect_semantic_scholar_papers
 
     if body.source == "arxiv":

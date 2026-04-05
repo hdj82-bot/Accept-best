@@ -98,6 +98,13 @@ def collect_arxiv_papers(query: str, max_results: int = 10) -> list:
                         collected_ids.append(paper_id)
 
     _run_async(_insert())
+
+    # Invalidate search & meta caches after new papers arrive
+    if collected_ids:
+        from app.services import cache_service
+        _run_async(cache_service.invalidate_search())
+        _run_async(cache_service.invalidate_meta())
+
     return collected_ids
 
 
@@ -167,4 +174,10 @@ def collect_semantic_scholar_papers(query: str, max_results: int = 10) -> list:
                         collected_ids.append(paper_id)
 
     _run_async(_insert())
+
+    if collected_ids:
+        from app.services import cache_service
+        _run_async(cache_service.invalidate_search())
+        _run_async(cache_service.invalidate_meta())
+
     return collected_ids

@@ -41,7 +41,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,5 +80,11 @@ app.include_router(translate_router, prefix="/api")
 # ── Prometheus metrics ─────────────────────────────────────────────────────────
 
 @app.get("/metrics", include_in_schema=False)
-async def metrics():
+async def metrics(request: Request):
+    # 내부 네트워크(Docker)에서만 접근 허용
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "")
+    internal_prefixes = ("127.", "10.", "172.", "192.168.", "::1")
+    if client_ip and not any(client_ip.startswith(p) for p in internal_prefixes):
+        return Response(status_code=403)
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

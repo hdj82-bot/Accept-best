@@ -71,12 +71,19 @@ async def delete_survey_question(
 async def generate_survey_questions(
     paper_id: uuid.UUID,
     user_id: str = Depends(get_current_user),
-    # plan_required("basic") 적용 위치 — basic 이상만 생성 가능
+    db: AsyncSession = Depends(get_db),
 ):
     """
     paper_id에 대한 설문 질문 자동 생성 태스크를 Celery에 비동기 실행.
+    basic 이상 플랜만 사용 가능.
     결과는 태스크 완료 후 survey_questions 테이블에 저장됨.
     """
+    from app.services.user_service import get_user_by_id  # noqa: PLC0415
+    user = await get_user_by_id(user_id, db)
+    plan_order = {"free": 0, "basic": 1, "pro": 2, "admin": 3}
+    if not user or plan_order.get(user.plan, 0) < plan_order.get("basic", 1):
+        raise HTTPException(status_code=403, detail="설문 생성은 basic 이상 플랜에서 사용 가능합니다")
+
     from app.tasks.process import generate_survey_questions as celery_task
 
     task = celery_task.delay(user_id=user_id, paper_id=str(paper_id))

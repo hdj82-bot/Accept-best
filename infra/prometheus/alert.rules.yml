@@ -1,0 +1,50 @@
+groups:
+  - name: academi-ai-alerts
+    rules:
+      # 백엔드 다운
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "백엔드 서비스 다운"
+          description: "백엔드가 1분 이상 응답하지 않습니다."
+
+      # 높은 에러율 (5분간 5xx 비율 > 5%)
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(research_requests_total{status=~"5.."}[5m]))
+            / sum(rate(research_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "높은 API 에러율"
+          description: "5분간 5xx 에러 비율이 5%를 초과합니다. 현재: {{ $value | humanizePercentage }}"
+
+      # 논문 검색 지연
+      - alert: SlowPaperSearch
+        expr: |
+          histogram_quantile(0.95,
+            rate(paper_search_total_bucket[5m])
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "논문 검색 응답 지연"
+          description: "95% 검색 응답 시간이 10초를 초과합니다."
+
+      # 디스크 사용량 (PostgreSQL)
+      - alert: HighDiskUsage
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "디스크 여유 공간 부족"
+          description: "디스크 여유 공간이 10% 미만입니다."

@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from typing import Optional
+
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +24,12 @@ async def rerank_papers(
     Adds ``rerank_score`` (float 0-1) and ``rerank_reason`` (str) to every dict.
     Returns up to *top_k* papers sorted by score descending.
 
-    When USE_FIXTURES=true (or papers is empty) returns papers as-is with
+    When use_fixtures=true (or papers is empty) returns papers as-is with
     fixture scores so tests / local dev never hit the real API.
     """
-    use_fixtures = os.getenv("USE_FIXTURES", "true").lower() in ("1", "true", "yes")
+    settings = get_settings()
 
-    if use_fixtures or not papers:
+    if settings.use_fixtures or not papers:
         result = []
         for p in papers[:top_k]:
             p = dict(p)
@@ -54,10 +54,20 @@ async def rerank_papers(
         f"논문 목록:\n{paper_list_str}"
     )
 
+    if not settings.anthropic_api_key:
+        logger.warning("ANTHROPIC_API_KEY not set — returning papers in original order")
+        result = []
+        for p in papers[:top_k]:
+            p = dict(p)
+            p["rerank_score"] = 0.5
+            p["rerank_reason"] = "API key not configured"
+            result.append(p)
+        return result
+
     try:
         import anthropic
 
-        client = anthropic.AsyncAnthropic()
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         message = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,

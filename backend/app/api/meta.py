@@ -24,7 +24,13 @@ router = APIRouter(prefix="/meta", tags=["meta"])
 
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):
-    """Return total paper and user counts."""
+    """Return total paper and user counts (cached 10 min)."""
+    from app.services import cache_service
+
+    cached = await cache_service.get(cache_service.meta_stats_key())
+    if cached is not None:
+        return cached
+
     paper_count_result = await db.execute(
         select(func.count()).select_from(Paper)
     )
@@ -35,7 +41,9 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     )
     total_users: int = user_count_result.scalar_one()
 
-    return {"total_papers": total_papers, "total_users": total_users}
+    result = {"total_papers": total_papers, "total_users": total_users}
+    await cache_service.set(cache_service.meta_stats_key(), result, ttl=cache_service.TTL_META)
+    return result
 
 
 @router.get("/sitemap")
