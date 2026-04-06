@@ -8,6 +8,7 @@ import CollectionPanel from "@/components/CollectionPanel";
 import EmptyState from "@/components/EmptyState";
 import { Skeleton, SkeletonCard } from "@/components/Skeleton";
 import { useCollections, invalidate } from "@/lib/hooks";
+import { useLocale } from "@/lib/i18n";
 import {
   deleteCollection,
   getCollectionPapers,
@@ -110,8 +111,8 @@ function PaperListPanel({ collection, onClose }: PaperListPanelProps) {
           ) : papers.length === 0 ? (
             <EmptyState
               icon="📄"
-              title="논문이 없습니다"
-              description="검색 결과에서 이 컬렉션에 논문을 추가하세요."
+              title={t("collections.noPapersInCol")}
+              description={t("collections.noPapersInColDesc")}
             />
           ) : (
             papers.map((p) => (
@@ -148,6 +149,7 @@ function PaperListPanel({ collection, onClose }: PaperListPanelProps) {
 
 function CollectionsContent() {
   const { data: collections, isLoading: loadingCols, error: colsError } = useCollections();
+  const { t } = useLocale();
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [tagPapers, setTagPapers] = useState<Paper[]>([]);
@@ -176,7 +178,7 @@ function CollectionsContent() {
   };
 
   const handleDeleteCollection = async (id: string) => {
-    if (!confirm("이 컬렉션을 삭제하시겠습니까?")) return;
+    if (!confirm(t("collections.deleteConfirm"))) return;
     try {
       await deleteCollection(id);
       invalidate("collections");
@@ -188,9 +190,9 @@ function CollectionsContent() {
       <header className="border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl items-center gap-4">
           <Link href="/dashboard" className="text-sm text-slate-500 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-slate-200">
-            ← 대시보드
+            {t("common.backToDashboard")}
           </Link>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">내 컬렉션</h1>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t("collections.title")}</h1>
         </div>
       </header>
 
@@ -198,7 +200,7 @@ function CollectionsContent() {
 
         {/* Collections grid */}
         <section aria-labelledby="collections-heading">
-          <h2 id="collections-heading" className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">컬렉션</h2>
+          <h2 id="collections-heading" className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">{t("collections.heading")}</h2>
           {loadingCols ? (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               <SkeletonCard />
@@ -209,15 +211,15 @@ function CollectionsContent() {
             <EmptyState
               icon="⚠️"
               tone="error"
-              title="컬렉션을 불러올 수 없습니다"
-              description="네트워크를 확인하고 다시 시도해 주세요."
+              title={t("collections.loadError")}
+              description={t("collections.loadErrorDesc")}
             />
           ) : !collections || collections.length === 0 ? (
             <EmptyState
               icon="📁"
-              title="컬렉션이 없습니다"
-              description="논문 검색에서 컬렉션에 추가해 보세요."
-              action={{ label: "논문 검색하러 가기", href: "/research" }}
+              title={t("collections.empty")}
+              description={t("collections.emptyDesc")}
+              action={{ label: t("collections.goSearch"), href: "/research" }}
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -244,12 +246,12 @@ function CollectionsContent() {
                     </button>
                   </div>
                   <p className="text-2xl font-bold text-slate-700 dark:text-slate-200">{col.paper_count}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">편의 논문</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{t("collections.papers")}</p>
                   <button
                     onClick={() => setOpenCollection(col)}
                     className="mt-4 rounded-lg border border-slate-200 py-1.5 text-xs text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
                   >
-                    논문 보기 →
+                    {t("collections.viewPapers")}
                   </button>
                 </div>
               ))}
@@ -260,7 +262,7 @@ function CollectionsContent() {
         {/* Tag cloud */}
         {tags.length > 0 && (
           <section aria-labelledby="tags-heading">
-            <h2 id="tags-heading" className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">태그</h2>
+            <h2 id="tags-heading" className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">{t("collections.tags")}</h2>
             <div className="flex flex-wrap gap-2" role="list" aria-label="태그 목록">
               {tags.map(({ tag, count }) => (
                 <button
@@ -291,7 +293,7 @@ function CollectionsContent() {
                     <Skeleton height={64} />
                   </div>
                 ) : tagPapers.length === 0 ? (
-                  <EmptyState icon="📄" title="해당 태그의 논문이 없습니다" description="다른 태그를 선택해 보세요." />
+                  <EmptyState icon="📄" title={t("collections.noTagPapers")} description={t("collections.noTagPapersDesc")} />
                 ) : (
                   <ul className="space-y-2" aria-label={`#${activeTag} 태그 논문 목록`}>
                     {tagPapers.map((p) => (
@@ -312,7 +314,7 @@ function CollectionsContent() {
                           onClick={() => setCollectionTargetPaper(p.id)}
                           className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-blue-300 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-600 dark:text-slate-400"
                         >
-                          + 컬렉션
+                          {t("collections.addToCollection")}
                         </button>
                       </li>
                     ))}

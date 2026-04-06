@@ -4,25 +4,28 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
-
-const NAV_LINKS = [
-  { href: "/dashboard",   label: "홈",     icon: "🏠" },
-  { href: "/research",    label: "연구",   icon: "📄" },
-  { href: "/bookmarks",   label: "북마크", icon: "🤍" },
-  { href: "/collections", label: "컬렉션", icon: "📁" },
-  { href: "/billing",     label: "플랜",   icon: "💳" },
-  { href: "/settings",    label: "설정",   icon: "⚙️" },
-];
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useLocale } from "@/lib/i18n";
 
 /**
  * Persistent bottom navigation bar — only rendered when authenticated.
- * Mobile/tablet only (hidden ≥ lg). Includes ThemeToggle.
+ * Mobile/tablet only (hidden ≥ lg). Includes ThemeToggle + LanguageSwitcher.
  */
 export default function GlobalNav() {
   const { status } = useSession();
   const pathname = usePathname();
+  const { t } = useLocale();
 
   if (status !== "authenticated" || pathname === "/") return null;
+
+  const NAV_LINKS = [
+    { href: "/dashboard",   label: t("nav.home"),        icon: "🏠" },
+    { href: "/research",    label: t("nav.research"),    icon: "📄" },
+    { href: "/bookmarks",   label: t("nav.bookmarks"),   icon: "🤍" },
+    { href: "/collections", label: t("nav.collections"), icon: "📁" },
+    { href: "/billing",     label: t("nav.billing"),     icon: "💳" },
+    { href: "/settings",    label: t("nav.settings"),    icon: "⚙️" },
+  ];
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95 lg:hidden">
@@ -45,9 +48,10 @@ export default function GlobalNav() {
           );
         })}
 
-        {/* Theme toggle slot */}
-        <div className="flex flex-col items-center justify-center px-3">
+        {/* Theme toggle + Language switcher */}
+        <div className="flex flex-col items-center justify-center gap-1 px-2">
           <ThemeToggle />
+          <LanguageSwitcher compact />
         </div>
       </div>
     </nav>
