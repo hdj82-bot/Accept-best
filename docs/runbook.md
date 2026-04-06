@@ -1,52 +1,84 @@
 # academi.ai — 프로덕션 Runbook
 
-> 운영 담당자가 배포/장애 대응 시 참조하는 문서. 모든 명령은 배포 서버(`/srv/academi.ai`) 기준.
+> 운영 담당자가 배포/장애 대응 시 참조하는 문서.
+> 모든 명령은 배포 서버 `/srv/academi.ai` 기준.
 
 ---
 
 ## 1. 아키텍처 요약
 
 ```
- Internet
-    │
-    ▼
-  nginx (443, TLS 종단)
-    ├── / → frontend (Next.js :3000)
-    └── /api/ → backend (FastAPI :8000)
-                 ├── db (Postgres + pgvector)
-                 ├── redis (브로커 + 캐시)
-                 ├── celery-collect (Q: collect)
-                 ├── celery-process (Q: process)
-                 └── celery-beat (스케줄러)
+Internet
+   |
+   v
+ nginx (80->443, TLS)
+   |-- /       -> frontend (Next.js :3000, standalone)
+   `-- /api/   -> backend  (FastAPI :8000)
+                    |-- db    (Postgres 16 + pgvector)
+                    |-- redis (broker + cache, AOF)
+                    |-- celery-collect  (Q: collect, concurrency 2)
+                    |-- celery-process  (Q: process, concurrency 4)
+                    `-- celery-beat     (scheduler)
 
- 관측성: prometheus → grafana, loki ← promtail, sentry (외부)
- 백업:   pg-backup 컨테이너 (cron) → S3
+ cert:    certbot (12h auto renew)
+ metrics: prometheus -> grafana
+ logs:    stdout -> promtail -> loki -> grafana
+ alerts:  grafana unified alerting
+ errors:  sentry (backend + frontend)
 ```
 
-## 2. 긴급 연락처 / 대시보드
+### 리소스 제한
 
-| 리소스 | URL / 경로 |
+| 서비스 | 메모리 |
 |---|---|
-| Grafana | https://grafana.internal/ |
-| Sentry (백엔드) | https://sentry.io/organizations/academi/projects/academi-backend/ |
-| Sentry (프론트) | https://sentry.io/organizations/academi/projects/academi-frontend/ |
-| Uptime | (외부 업체) |
-| 서버 SSH | `ssh deploy@prod.academi.example` |
+| db | 512m |
+| redis | 192m (maxmemory 128mb) |
+| backend | 512m |
+| celery-collect | 256m |
+| celery-process | 256m |
+| celery-beat | 128m |
+| frontend | 256m |
+| nginx | 128m |
+| prometheus | 256m |
+| grafana | 256m |
+| loki | 256m |
+| promtail | 128m |
 
 ---
 
-## 3. 일상 배포
+## 2. 대시보드
 
-### 자동 (main 머지 시)
-1. PR이 main에 머지되면 `.github/workflows/deploy.yml`이 실행
-2. Docker 이미지 빌드 → Docker Hub 푸시 → SSH로 서버에서 `compose pull && up -d`
-3. Alembic 마이그레이션 자동 실행
+| 리소스 | URL |
+|---|---|
+| Grafana | http://127.0.0.1:3001 (localhost only) |
+| Prometheus | http://127.0.0.1:9090 |
+| Sentry (backend) | sentry.io -> academi-backend |
+| Sentry (frontend) | sentry.io -> academi-frontend |
+
+### Grafana 알림 규칙
+
+| UID | 조건 | 심각도 |
+|---|---|---|
+| academi-5xx-high | 5xx > 5% (5m) | critical |
+| academi-api-latency | p95 > 2s (10m) | warning |
+| academi-db-conn | conn > 85% max (5m) | warning |
+| academi-queue-backlog | queue > 500 (10m) | warning |
+| academi-celery-failure-rate | task fail > 10% (5m) | critical |
+| academi-celery-task-latency | task p95 > 60s (5m) | warning |
+| academi-redis-memory | mem > 80% max (5m) | warning |
+| academi-redis-connection-spike | clients > 200 (5m) | warning |
+| academi-container-restart | 3+ restarts/15m | critical |
+
+---
+
+## 3. 배포
+
+### 자동 (main merge)
+`.github/workflows/deploy.yml` -> Docker build -> push -> SSH deploy -> alembic migrate
 
 ### 수동
 ```bash
-ssh deploy@prod.academi.example
 cd /srv/academi.ai
-git pull
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
@@ -54,187 +86,230 @@ docker compose -f docker-compose.prod.yml ps
 ```
 
 ### 배포 전 체크리스트
-- [ ] CI 그린 (test-backend / test-frontend / e2e / lint)
-- [ ] Alembic 마이그레이션이 있으면 롤백 경로 확인 (`alembic downgrade -1` 가능?)
-- [ ] 환경변수 추가가 필요하면 **`.env`에 먼저 반영**
-- [ ] 운영 시간 외 배포 권장 (KST 23:00~08:00)
+- [ ] CI 그린
+- [ ] alembic downgrade -1 가능 확인
+- [ ] .env 새 변수 반영
+- [ ] 운영시간 외 배포 권장
 
-### 배포 후 체크리스트 (5분)
-- [ ] `curl https://your-domain/health/live` → 200
-- [ ] 내부망에서 `curl http://backend:8000/health/deep` → 모든 check OK
-- [ ] Grafana **API Overview** 대시보드 — 5xx 0%, p95 정상
-- [ ] Sentry — 새로운 이슈 급증 없음
-- [ ] 2-3개 핵심 유저 플로우 수동 검증
+### 배포 후 검증 (5분)
+- [ ] curl -fsS https://domain/health -> 200
+- [ ] Grafana -> 5xx 없음, p95 정상
+- [ ] Sentry -> 새 이슈 없음
 
 ---
 
 ## 4. 롤백
 
-### 애플리케이션 롤백 (빠름)
+### 앱 롤백
 ```bash
-cd /srv/academi.ai
-# Docker Hub에서 이전 커밋 태그로 되돌림
-export PREV_SHA=<이전 정상 커밋 해시>
-docker compose -f docker-compose.prod.yml pull
-docker tag $DOCKERHUB_USERNAME/academi-backend:$PREV_SHA $DOCKERHUB_USERNAME/academi-backend:latest
-docker tag $DOCKERHUB_USERNAME/academi-frontend:$PREV_SHA $DOCKERHUB_USERNAME/academi-frontend:latest
+export IMAGE_TAG=<이전-정상-SHA>
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-### DB 마이그레이션 롤백
+### DB 롤백
 ```bash
 docker compose -f docker-compose.prod.yml exec -T backend alembic downgrade -1
 ```
-> 주의: 컬럼 DROP 포함된 마이그레이션은 되돌릴 수 없음. **배포 전 확인 필수.**
-
-### DB 복구 (최후수단 — 데이터 손실)
-백업 복구는 §7 참조. RTO 목표: **30분**, RPO: **24시간** (일일 백업 기준).
 
 ---
 
-## 5. 장애 대응 플레이북
+## 5. 장애 대응
 
-### 5.1 5xx 급증 (>5% for 5m)
-Grafana 알림 트리거: `academi-5xx-high`
-1. Grafana **API Overview** → 어느 라우트에서 발생하는지 확인 (`handler` 차원)
-2. Sentry 최근 이슈 → 스택트레이스 확인
-3. 로그: Grafana Explore → `{service="backend", level="error"}` 최근 10분
-4. DB 원인 가능성:
-   ```bash
-   docker compose -f docker-compose.prod.yml exec db \
-     psql -U academi -c "SELECT pid, state, wait_event, query FROM pg_stat_activity WHERE state != 'idle';"
-   ```
-5. 원인이 명확하면 hotfix, 아니면 **롤백** (§4)
+### 5.1 API 다운
 
-### 5.2 p95 레이턴시 > 2s
-1. **Infra & DB** 대시보드 → DB 연결수, commit/rollback 비율
-2. Celery 큐 backlog 확인 → backlog가 쌓이면 동기 경로가 느려짐
-3. 느린 쿼리 확인:
-   ```bash
-   docker compose exec db psql -U academi -c \
-     "SELECT query, mean_exec_time, calls FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;"
-   ```
-4. 임시 완화: `docker compose -f docker-compose.prod.yml up -d --scale backend=3`
+**증상**: nginx 502/504, /health timeout
 
-### 5.3 Celery 큐 적체 (>500)
-Grafana 알림: `academi-queue-backlog`
+**확인**:
 ```bash
-# 워커 스케일 아웃
-docker compose -f docker-compose.prod.yml up -d --scale celery-process=4
-# 큐 상태 확인
-docker compose exec redis redis-cli LLEN process
-# Dead letter / 재시도 무한루프 확인
-docker compose logs celery-process --tail=200 | grep -i retry
+docker compose -f docker-compose.prod.yml ps backend
+docker compose -f docker-compose.prod.yml logs backend --tail=100
 ```
 
-### 5.4 DB 연결 포화 (>85%)
-1. 연결 풀 누수 의심 → 앱 재시작: `docker compose restart backend`
-2. 유휴 연결 정리:
-   ```sql
-   SELECT pg_terminate_backend(pid)
-   FROM pg_stat_activity
-   WHERE state = 'idle' AND state_change < now() - interval '10 minutes';
-   ```
-3. 근본 원인: SQLAlchemy `pool_size` 조정 (앱 설정)
+**복구**:
+```bash
+# 재시작
+docker compose -f docker-compose.prod.yml restart backend
+# OOM 확인
+docker inspect $(docker compose -f docker-compose.prod.yml ps -q backend) | grep -i oom
+# 코드 버그 -> 롤백
+```
 
-### 5.5 디스크 풀
+---
+
+### 5.2 DB 연결 실패
+
+**증상**: 500 + connection refused / too many connections
+
+**확인**:
+```bash
+docker compose -f docker-compose.prod.yml exec db \
+  psql -U academi -c "SELECT count(*) FROM pg_stat_activity;"
+docker compose -f docker-compose.prod.yml exec db \
+  psql -U academi -c "SELECT pid, state, wait_event_type, query
+    FROM pg_stat_activity WHERE state != 'idle';"
+```
+
+**복구**:
+```bash
+# 유휴 연결 정리
+docker compose -f docker-compose.prod.yml exec db \
+  psql -U academi -c "SELECT pg_terminate_backend(pid)
+    FROM pg_stat_activity
+    WHERE state = 'idle' AND state_change < now() - interval '10 minutes';"
+# DB 재시작
+docker compose -f docker-compose.prod.yml restart db
+# 이후 앱 재시작
+docker compose -f docker-compose.prod.yml restart backend celery-collect celery-process celery-beat
+```
+
+---
+
+### 5.3 Redis 다운
+
+**증상**: Celery 태스크 실행 안 됨, ConnectionError: Redis
+
+**확인**:
+```bash
+docker compose -f docker-compose.prod.yml exec redis redis-cli ping
+docker compose -f docker-compose.prod.yml exec redis redis-cli info memory
+```
+
+**복구**:
+```bash
+docker compose -f docker-compose.prod.yml restart redis
+# eviction 확인
+docker compose -f docker-compose.prod.yml exec redis redis-cli info stats | grep evicted_keys
+# Celery 재시작
+docker compose -f docker-compose.prod.yml restart celery-collect celery-process celery-beat
+```
+
+---
+
+### 5.4 Celery 큐 적체 (> 500)
+
+**증상**: Grafana academi-queue-backlog 알림
+
+**확인**:
+```bash
+docker compose -f docker-compose.prod.yml exec redis redis-cli LLEN collect
+docker compose -f docker-compose.prod.yml exec redis redis-cli LLEN process
+docker compose -f docker-compose.prod.yml logs celery-process --tail=200 | grep -i "retry\|MaxRetries"
+```
+
+**복구**:
+```bash
+# 스케일 아웃
+docker compose -f docker-compose.prod.yml up -d --scale celery-process=4
+# 무한 실패 -> 큐 퍼지 (주의!)
+docker compose -f docker-compose.prod.yml exec redis redis-cli DEL process
+# 정상화 후 복원
+docker compose -f docker-compose.prod.yml up -d --scale celery-process=1
+```
+
+---
+
+### 5.5 디스크 부족
+
+**확인**:
 ```bash
 df -h
 docker system df
-# 정리
-docker image prune -af --filter "until=168h"
-docker volume prune -f  # 주의: 사용 중이지 않은 볼륨만
-# DB WAL 누적 시
-docker compose exec db psql -U academi -c "CHECKPOINT;"
 ```
 
-### 5.6 완전 다운
+**복구**:
 ```bash
-# 빠른 재시작
-docker compose -f docker-compose.prod.yml restart
-# 그래도 안 되면
-docker compose -f docker-compose.prod.yml down
-docker compose -f docker-compose.prod.yml up -d
-# nginx만 죽었을 때
-docker compose -f docker-compose.prod.yml restart nginx
+docker image prune -af --filter "until=168h"
+docker builder prune -af
+docker compose -f docker-compose.prod.yml exec db psql -U academi -c "CHECKPOINT;"
+find /srv/academi.ai/infra/scripts/backups/ -mtime +7 -delete
 ```
 
 ---
 
-## 6. TLS 인증서 갱신
-Let's Encrypt 자동 갱신이 기본. 수동 갱신:
+### 5.6 전면 장애
+
 ```bash
-docker compose -f docker-compose.prod.yml run --rm certbot renew
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml exec -T backend alembic current
+```
+
+---
+
+## 6. 백업
+
+### 수동 백업
+```bash
+docker compose -f docker-compose.prod.yml exec db \
+  pg_dump -U academi --format=custom academi \
+  | gzip > /srv/academi.ai/infra/scripts/backups/academi-$(date +%Y%m%d).sql.gz
+```
+
+### S3 업로드
+```bash
+aws s3 cp backups/academi-YYYYMMDD.sql.gz s3://$S3_BUCKET/pg-backups/ --storage-class STANDARD_IA
+```
+
+### 복구
+```bash
+gunzip -c academi-YYYYMMDD.sql.gz | \
+  docker compose -f docker-compose.prod.yml exec -T db \
+    pg_restore -U academi --dbname=academi --clean --if-exists --no-owner
+docker compose -f docker-compose.prod.yml restart backend celery-collect celery-process celery-beat
+```
+
+---
+
+## 7. 인증서
+
+certbot이 12시간마다 자동 갱신합니다.
+
+### 수동 갱신
+```bash
+docker compose -f docker-compose.prod.yml exec certbot certbot renew --force-renewal
 docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
 ```
 
 ---
 
-## 7. 백업 & 복구
-
-### 백업 확인
-```bash
-aws s3 ls s3://$S3_BUCKET/pg-backups/ --region ap-northeast-2 | tail -20
-# pg-backup 컨테이너 로그
-docker compose -f docker-compose.prod.yml logs pg-backup --tail=50
-```
-
-### 복구 (Dry-run → 실행)
-```bash
-# 가장 최근 백업 확인만
-docker compose -f docker-compose.prod.yml run --rm pg-backup \
-  /opt/backup/pg_restore.sh latest
-
-# 실제 복구 (기존 DB 덮어씀!)
-docker compose -f docker-compose.prod.yml run --rm \
-  -e CONFIRM=yes pg-backup \
-  /opt/backup/pg_restore.sh latest
-```
-
-### 월 1회 복구 드릴
-Staging 환경에 `latest` 백업을 복구해서 앱이 정상 동작하는지 확인.
-
----
-
 ## 8. 시크릿 로테이션
+
 ```bash
 # DB 비밀번호
-docker compose exec db psql -U postgres -c "ALTER USER academi WITH PASSWORD 'NEW_PASSWORD';"
-# .env의 POSTGRES_PASSWORD 업데이트 → 재배포
+docker compose -f docker-compose.prod.yml exec db \
+  psql -U postgres -c "ALTER USER academi WITH PASSWORD 'NEW';"
+# .env 업데이트 -> 재배포
 
-# NEXTAUTH_SECRET — 바꾸면 모든 세션 무효화
+# NEXTAUTH_SECRET (전세션 무효화)
 openssl rand -hex 32
-# .env 업데이트 → frontend 재시작
+# .env 업데이트 -> frontend 재시작
 ```
-
-모든 시크릿은 **서버의 .env + GitHub Secrets**에만 존재. 절대 git에 커밋 금지.
 
 ---
 
-## 9. 첫 서버 부트스트랩 (신규 서버)
+## 9. 신규 서버
+
 ```bash
-# 1. Docker, Compose plugin 설치
 curl -fsSL https://get.docker.com | sh
-# 2. 디렉터리
 sudo mkdir -p /srv/academi.ai && sudo chown $USER /srv/academi.ai
 cd /srv/academi.ai
 git clone https://github.com/hdj82-bot/academi.ai.git .
-# 3. .env 작성 (.env.example 참고)
 cp .env.example .env && vi .env
-# 4. TLS 발급 (최초 1회)
-./infra/nginx/init-letsencrypt.sh
-# 5. 기동
+docker compose -f docker-compose.prod.yml up -d nginx
+docker compose -f docker-compose.prod.yml run --rm certbot certonly \
+  --webroot -w /var/www/certbot -d your-domain.com
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
 ```
 
 ---
 
-## 10. SLO / SLI 목표
+## 10. SLO
 
 | 지표 | 목표 | 측정 |
 |---|---|---|
-| 가용성 | 99.5%/월 | uptime 체크 |
-| p95 API 레이턴시 | < 800ms | `http_request_duration_seconds` |
+| 가용성 | 99.5%/월 | uptime check |
+| API p95 | < 800ms | http_request_duration_seconds |
 | 에러율 | < 1% | 5xx / total |
-| 백업 신선도 | < 25h | S3 최신 객체 시각 |
+| 백업 신선도 | < 25h | S3 latest object |
+| Celery 큐 | < 500 | celery_queue_length |
