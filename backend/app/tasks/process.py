@@ -6,7 +6,6 @@ Queue: process  (relatively fast; users may be waiting on results)
 
 import logging
 
-import anthropic
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
@@ -34,6 +33,8 @@ def _run_async(coro):
     name="app.tasks.process.summarize_paper",
     queue="process",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def summarize_paper(paper_id: str) -> dict:
     logger.info("summarize_paper: paper_id=%s", paper_id)
@@ -50,6 +51,14 @@ def summarize_paper(paper_id: str) -> dict:
         if paper is None:
             raise ExternalAPIError("DB", f"paper {paper_id} not found")
 
+        if settings.use_fixtures:
+            return f"[fixture] {(paper.title or '')[:100]} 요약"
+
+        if not settings.anthropic_api_key:
+            logger.warning("ANTHROPIC_API_KEY not set — skipping summarization for paper %s", paper_id)
+            return ""
+
+        import anthropic
         prompt = f"Title: {paper.title}\n\nAbstract: {paper.abstract or ''}"
 
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -86,6 +95,8 @@ def summarize_paper(paper_id: str) -> dict:
     name="app.tasks.process.embed_paper",
     queue="process",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def embed_paper(paper_id: str) -> dict:
     logger.info("embed_paper: paper_id=%s", paper_id)
@@ -159,6 +170,8 @@ def rerank_search_results(query: str, paper_ids: list[str]) -> list[dict]:
     name="app.tasks.process.generate_survey_questions",
     queue="process",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def generate_survey_questions(paper_id: str, user_id: str) -> dict:
     logger.info(
@@ -180,6 +193,31 @@ def generate_survey_questions(paper_id: str, user_id: str) -> dict:
         if paper is None:
             raise ExternalAPIError("DB", f"paper {paper_id} not found")
 
+        if settings.use_fixtures:
+            fixture_qs = [
+                {"original_q": f"[fixture] {paper.title} 관련 질문 {i}", "adapted_q": f"[fixture] 적용 질문 {i}"}
+                for i in range(1, 4)
+            ]
+            created_ids = []
+            async with _SessionLocal() as session:
+                async with session.begin():
+                    for q in fixture_qs:
+                        sq = SurveyQuestion(
+                            user_id=user_id,
+                            paper_id=paper_id,
+                            original_q=q["original_q"],
+                            adapted_q=q["adapted_q"],
+                            source_title=paper.title,
+                        )
+                        session.add(sq)
+                        await session.flush()
+                        created_ids.append(str(sq.id))
+            return created_ids
+
+        if not settings.anthropic_api_key:
+            raise ExternalAPIError("Anthropic", "ANTHROPIC_API_KEY not configured")
+
+        import anthropic
         prompt = (
             f"Title: {paper.title}\n\nAbstract: {paper.abstract or ''}\n\n"
             "논문 내용 기반으로 연구자가 논문 집필 시 참고할 수 있는 핵심 질문 5개를 생성하세요 (한국어). "

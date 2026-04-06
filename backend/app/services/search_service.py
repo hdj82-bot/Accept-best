@@ -158,11 +158,10 @@ async def search_papers_hybrid(
     # Collect all paper ids from both result sets
     all_ids = set(vector_map.keys()) | set(keyword_score_map.keys())
 
-    # We need full row dicts for keyword-only results — fetch them
+    # We need full row dicts for keyword-only results — batch fetch
     keyword_only_ids = set(keyword_score_map.keys()) - set(vector_map.keys())
     extra_rows_map: dict[str, dict] = {}
     if keyword_only_ids:
-        # Convert to list for the IN clause
         id_list = list(keyword_only_ids)
         extra_sql = text(
             "SELECT * FROM papers WHERE id = ANY(CAST(:ids AS uuid[]))"
@@ -173,15 +172,17 @@ async def search_papers_hybrid(
                 extra_rows_map[str(row["id"])] = {k: v for k, v in row.items()}
         except Exception:
             # Fallback for DBs that don't support ANY (e.g., SQLite in tests)
-            for pid in id_list:
-                fallback_sql = text("SELECT * FROM papers WHERE CAST(id AS TEXT) = :pid")
-                try:
-                    fr = await db.execute(fallback_sql, {"pid": pid})
-                    frow = fr.mappings().first()
-                    if frow:
-                        extra_rows_map[pid] = {k: v for k, v in frow.items()}
-                except Exception:
-                    pass
+            # Use a single IN query instead of N+1 loop
+            from sqlalchemy import select as sa_select
+            placeholders = ", ".join(f":pid_{i}" for i in range(len(id_list)))
+            fallback_sql = text(f"SELECT * FROM papers WHERE CAST(id AS TEXT) IN ({placeholders})")
+            params = {f"pid_{i}": pid for i, pid in enumerate(id_list)}
+            try:
+                fr = await db.execute(fallback_sql, params)
+                for frow in fr.mappings().all():
+                    extra_rows_map[str(frow["id"])] = {k: v for k, v in frow.items()}
+            except Exception:
+                logger.warning("keyword-only paper fetch failed for %d papers", len(id_list))
 
     merged: list[dict] = []
     for paper_id in all_ids:

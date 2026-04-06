@@ -25,10 +25,9 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
+    """사용자가 직접 수정 가능한 필드만 노출. plan/plan_expires_at은 결제 시스템에서만 변경."""
     name: Optional[str] = None
     image: Optional[str] = None
-    plan: Optional[PlanType] = None
-    plan_expires_at: Optional[datetime] = None
 
 
 class UserRead(UserBase):

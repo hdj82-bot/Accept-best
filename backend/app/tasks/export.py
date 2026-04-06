@@ -5,7 +5,6 @@ Queue: export
 """
 
 import logging
-import os
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -64,6 +63,8 @@ def _build_markdown(note, questions, papers) -> str:
     name="app.tasks.export.export_research_markdown",
     queue="export",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def export_research_markdown(note_id: str, user_id: str) -> str:
     logger.info("export_research_markdown: note_id=%s user_id=%s", note_id, user_id)
@@ -104,11 +105,15 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
 
     markdown_str = _run_async(_run())
 
-    use_fixtures = os.getenv("USE_FIXTURES", "false").lower() in ("1", "true", "yes")
-    if use_fixtures:
+    if settings.use_fixtures:
         export_jobs_total.labels(format="markdown", status="success").inc()
         from app.tasks.notify import send_research_complete  # noqa: PLC0415
         send_research_complete.delay(user_id, note_id, "fixtures://markdown")
+        return markdown_str
+
+    if not settings.aws_access_key_id or not settings.aws_s3_bucket:
+        logger.warning("AWS credentials not set — returning markdown content directly")
+        export_jobs_total.labels(format="markdown", status="success").inc()
         return markdown_str
 
     # Upload to S3 and return presigned URL
@@ -144,6 +149,8 @@ def export_research_markdown(note_id: str, user_id: str) -> str:
     name="app.tasks.export.export_research_pdf",
     queue="export",
     max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=300,
 )
 def export_research_pdf(note_id: str, user_id: str) -> str:
     logger.info("export_research_pdf: note_id=%s user_id=%s", note_id, user_id)
@@ -181,8 +188,7 @@ def export_research_pdf(note_id: str, user_id: str) -> str:
 
     markdown_str = _run_async(_run())
 
-    use_fixtures = os.getenv("USE_FIXTURES", "false").lower() in ("1", "true", "yes")
-    if use_fixtures:
+    if settings.use_fixtures:
         export_jobs_total.labels(format="pdf", status="success").inc()
         return "fixtures_pdf_export"
 
@@ -192,6 +198,11 @@ def export_research_pdf(note_id: str, user_id: str) -> str:
 
     html_content = md.markdown(markdown_str)
     pdf_bytes = HTML(string=html_content).write_pdf()
+
+    if not settings.aws_access_key_id or not settings.aws_s3_bucket:
+        logger.warning("AWS credentials not set — cannot upload PDF to S3")
+        export_jobs_total.labels(format="pdf", status="error").inc()
+        raise ValueError("AWS S3 credentials not configured for PDF export")
 
     # Upload to S3 and return presigned URL
     import boto3

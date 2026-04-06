@@ -1,19 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import UsageIndicator from "@/components/UsageIndicator";
-import {
-  getMe,
-  getNotes,
-  getSearchHistory,
-  type User,
-  type ResearchNote,
-  type SearchHistoryItem,
-} from "@/lib/api";
+import { useUser, useNotes, useSearchHistory } from "@/lib/hooks";
 
 export default function DashboardPage() {
   return (
@@ -26,21 +18,12 @@ export default function DashboardPage() {
 function DashboardContent() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [notes, setNotes] = useState<ResearchNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(true);
-  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const { data: user } = useUser();
+  const { data: allNotes, isLoading: notesLoading } = useNotes();
+  const { data: allHistory } = useSearchHistory();
 
-  useEffect(() => {
-    getMe().then(setUser).catch(() => null);
-    getNotes()
-      .then((n) => setNotes(n.slice(0, 5)))
-      .catch(() => null)
-      .finally(() => setNotesLoading(false));
-    getSearchHistory()
-      .then((h) => setSearchHistory(h.slice(0, 3)))
-      .catch(() => null);
-  }, []);
+  const notes = (allNotes ?? []).slice(0, 5);
+  const searchHistory = (allHistory ?? []).slice(0, 3);
 
   return (
     <main className="min-h-screen bg-slate-50">

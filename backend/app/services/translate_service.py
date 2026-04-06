@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -11,17 +12,24 @@ logger = logging.getLogger(__name__)
 async def translate_text(text: str, target_lang: str = "KO") -> dict:
     """
     DeepL API로 텍스트 번역.
-    USE_FIXTURES=true 또는 deepl_api_key 미설정 시 mock 반환.
+    use_fixtures=true 또는 deepl_api_key 미설정 시 mock 반환.
     실패 시 원문 그대로 반환 (폴백).
     """
-    from app.core.config import get_settings
     settings = get_settings()
 
-    if os.getenv("USE_FIXTURES", "false").lower() == "true" or not settings.deepl_api_key:
+    if settings.use_fixtures:
         return {
             "translated_text": f"[번역 미리보기] {text[:100]}",
             "detected_source_lang": "EN",
             "fixture": True,
+        }
+
+    if not settings.deepl_api_key:
+        logger.warning("DEEPL_API_KEY not set — returning untranslated text")
+        return {
+            "translated_text": text,
+            "detected_source_lang": "unknown",
+            "error": "DEEPL_API_KEY not configured",
         }
 
     try:

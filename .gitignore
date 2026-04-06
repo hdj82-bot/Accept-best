@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.local
+.env.production
+
+# Backups
+infra/scripts/backups/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+
+# SSL certs (local)
+infra/nginx/ssl/
+
+# Docker
+.current-tag
+
+# OS
+.DS_Store
+Thumbs.db
