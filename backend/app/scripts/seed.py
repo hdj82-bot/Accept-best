@@ -43,7 +43,7 @@ async def seed():
     SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
     raw = json.loads(_FIXTURES_PATH.read_text(encoding="utf-8"))
-    papers = raw[:10]
+    papers = raw[:20]
 
     inserted = 0
     async with SessionLocal() as session:

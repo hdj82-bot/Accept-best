@@ -78,5 +78,77 @@
     "abstract": "Anthropic's Claude API provides reliable structured outputs for long-form text generation tasks including summarization, rewriting, and question answering over scientific documents.",
     "authors": ["Choi, Jungwon", "Han, Seyeon"],
     "keywords": ["Claude", "Anthropic", "structured generation", "summarization"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2307.00007",
+    "title": "Retrieval-Augmented Generation for Korean Academic Search",
+    "abstract": "We present a RAG pipeline optimized for Korean academic text, combining BM25 keyword retrieval with dense vector search to improve recall on RISS and KCI indexed papers.",
+    "authors": ["Park, Seongjun", "Kim, Yejin"],
+    "keywords": ["RAG", "Korean", "information retrieval", "BM25"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000005",
+    "title": "Automated Citation Network Analysis",
+    "abstract": "A graph-based approach to analyzing citation networks, identifying influential papers, research clusters, and emerging topics through community detection algorithms.",
+    "authors": ["Hwang, Sumin", "Jeon, Donghyuk"],
+    "keywords": ["citation analysis", "graph theory", "community detection"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2308.00008",
+    "title": "Multi-Document Summarization for Literature Reviews",
+    "abstract": "This study proposes a hierarchical attention model for multi-document summarization tailored to systematic literature reviews, achieving state-of-the-art ROUGE scores on the Multi-XScience dataset.",
+    "authors": ["Yoo, Jiyoung", "Seo, Minjun"],
+    "keywords": ["summarization", "literature review", "attention mechanism"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000006",
+    "title": "Research Ethics Compliance Checker Using NLP",
+    "abstract": "An NLP-powered tool for automatically detecting potential ethical issues in research manuscripts, including IRB requirement detection, informed consent verification, and conflict of interest disclosure.",
+    "authors": ["Moon, Jihye"],
+    "keywords": ["research ethics", "NLP", "compliance", "IRB"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2309.00009",
+    "title": "Diffusion Models for Scientific Figure Generation",
+    "abstract": "We fine-tune a latent diffusion model to generate publication-quality scientific figures from natural language descriptions, enabling researchers to quickly prototype visualizations.",
+    "authors": ["Ryu, Wonjun", "Lee, Haerin"],
+    "keywords": ["diffusion models", "figure generation", "scientific visualization"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000007",
+    "title": "Peer Review Quality Prediction with Transformers",
+    "abstract": "A transformer-based classifier trained on OpenReview data to predict the quality and helpfulness of peer review comments, assisting editors in identifying constructive feedback.",
+    "authors": ["Noh, Eunji", "Yang, Chanwoo"],
+    "keywords": ["peer review", "transformers", "quality prediction"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2310.00010",
+    "title": "Cross-lingual Academic Paper Recommendation",
+    "abstract": "A multilingual paper recommendation system using mBERT embeddings that enables Korean researchers to discover relevant English-language papers through cross-lingual semantic matching.",
+    "authors": ["Hong, Seoyeon", "Kwon, Doyeon"],
+    "keywords": ["recommendation system", "cross-lingual", "mBERT", "multilingual"]
+  },
+  {
+    "source": "semantic_scholar",
+    "source_id": "ss-10000008",
+    "title": "Automated Statistical Analysis Verification",
+    "abstract": "statcheck-ML extends rule-based statistical verification with machine learning to detect inconsistencies in reported p-values, effect sizes, and confidence intervals across social science papers.",
+    "authors": ["Baek, Sunghwan"],
+    "keywords": ["statistics", "verification", "p-value", "reproducibility"]
+  },
+  {
+    "source": "arxiv",
+    "source_id": "2311.00011",
+    "title": "Knowledge Graph Construction from Academic Papers",
+    "abstract": "We introduce SciKG, an end-to-end system for extracting entities, relations, and claims from scientific papers to construct a domain-specific knowledge graph for biomedical research.",
+    "authors": ["Shin, Gayoung", "Lim, Jaehyun"],
+    "keywords": ["knowledge graph", "information extraction", "biomedical NLP"]
   }
 ]

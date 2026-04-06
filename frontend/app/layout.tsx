@@ -6,6 +6,7 @@ import GlobalNav from "@/components/GlobalNav";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SkipLink from "@/components/SkipLink";
 import { ToastProvider } from "@/components/Toast";
+import { GA_MEASUREMENT_ID, isGAEnabled } from "@/lib/analytics";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -63,6 +64,18 @@ export default function RootLayout({
         {/* Theme init — must run before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
+      {/* Google Analytics 4 */}
+      {isGAEnabled && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}',{page_path:window.location.pathname});`}
+          </Script>
+        </>
+      )}
       {/* PortOne (아임포트) SDK — loaded after page is interactive */}
       <Script
         src="https://cdn.iamport.kr/v1/iamport.js"
