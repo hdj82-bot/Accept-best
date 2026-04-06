@@ -52,9 +52,9 @@ services:
         limits:
           memory: 512m
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
       retries: 3
       start_period: 30s
 
@@ -101,6 +101,10 @@ services:
         condition: service_healthy
     command: celery -A app.tasks beat --loglevel=info
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   frontend:
     image: ${DOCKERHUB_USERNAME}/academi-frontend:${IMAGE_TAG:-latest}
@@ -127,6 +131,10 @@ services:
       - backend
       - frontend
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   certbot:
     image: certbot/certbot:latest
@@ -136,20 +144,73 @@ services:
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done;'"
     restart: always
 
+  # --- Observability ---
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.54.1
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./infra/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
     restart: always
     deploy:
       resources:
         limits:
           memory: 256m
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_UNIFIED_ALERTING_ENABLED: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./infra/grafana/alerts:/etc/grafana/provisioning/alerting:ro
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  loki:
+    image: grafana/loki:3.1.1
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./infra/loki/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
 volumes:
   pg_data:
@@ -157,3 +218,5 @@ volumes:
   certbot_www:
   certbot_certs:
   prometheus_data:
+  grafana_data:
+  loki_data:
