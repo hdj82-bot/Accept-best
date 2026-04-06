@@ -1,249 +1,110 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  getMe,
-  getAdminStats,
-  getAdminUsers,
-  deleteAdminUser,
-  type AdminStats,
-  type AdminUser,
-  type Plan,
-} from "@/lib/api";
+import { useUser } from "@/lib/hooks";
+import { Skeleton } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
-// ────────────────────────────────────────────────────────────────────────────
-// Admin guard — plan must be "admin"
-// ────────────────────────────────────────────────────────────────────────────
+// 코드 스플리팅: 무거운 탭 컨텐츠는 필요할 때만 로드
+const OverviewTab = dynamic(() => import("./_components/OverviewTab"), {
+  loading: () => <TabLoading />,
+});
+const UsersTab = dynamic(() => import("./_components/UsersTab"), {
+  loading: () => <TabLoading />,
+});
+const UsageTab = dynamic(() => import("./_components/UsageTab"), {
+  loading: () => <TabLoading />,
+});
+const PaymentsTab = dynamic(() => import("./_components/PaymentsTab"), {
+  loading: () => <TabLoading />,
+});
+
+function TabLoading() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-live="polite">
+      <Skeleton height={120} />
+      <Skeleton height={200} />
+    </div>
+  );
+}
+
+// ── Admin guard ────────────────────────────────────────────────────────────
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const { data: user, error, isLoading } = useUser();
 
   useEffect(() => {
-    if (status === "unauthenticated") { router.replace("/"); return; }
-    if (status === "authenticated") {
-      getMe()
-        .then((u) => {
-          if (u.plan === "admin") setAllowed(true);
-          else router.replace("/dashboard");
-        })
-        .catch(() => router.replace("/dashboard"));
+    if (status === "unauthenticated") {
+      router.replace("/");
+      return;
     }
-  }, [status, router]);
+    if (user && user.plan !== "admin") {
+      router.replace("/dashboard");
+    }
+  }, [status, user, router]);
 
-  if (status === "loading" || allowed === null) {
+  if (status === "loading" || isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      <div
+        className="flex min-h-screen items-center justify-center"
+        role="status"
+        aria-live="polite"
+      >
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"
+          aria-hidden="true"
+        />
+        <span className="sr-only">권한 확인 중</span>
       </div>
     );
   }
+
+  if (error || !user) {
+    return (
+      <main className="mx-auto max-w-xl px-6 py-16">
+        <EmptyState
+          icon="🚫"
+          tone="error"
+          title="접근이 제한되었습니다"
+          description="세션이 만료되었거나 권한이 없습니다."
+          action={{ label: "로그인으로", href: "/" }}
+        />
+      </main>
+    );
+  }
+
+  if (user.plan !== "admin") {
+    return (
+      <main className="mx-auto max-w-xl px-6 py-16">
+        <EmptyState
+          icon="🔒"
+          title="관리자 전용 페이지"
+          description="이 페이지는 관리자만 접근할 수 있습니다."
+          action={{ label: "대시보드로", href: "/dashboard" }}
+        />
+      </main>
+    );
+  }
+
   return <>{children}</>;
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Mini bar chart (7-day usage)
-// ────────────────────────────────────────────────────────────────────────────
+// ── Admin 메인 ─────────────────────────────────────────────────────────────
 
-function BarChart({ data }: { data: AdminStats["daily_usage"] }) {
-  const max = Math.max(...data.map((d) => d.count), 1);
-  return (
-    <div className="flex h-28 items-end gap-1.5">
-      {data.map((d) => {
-        const pct = Math.round((d.count / max) * 100);
-        return (
-          <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
-            <span className="text-[10px] text-slate-400">{d.count}</span>
-            <div
-              className="w-full rounded-t bg-blue-400 transition-all"
-              style={{ height: `${pct}%`, minHeight: "2px" }}
-            />
-            <span className="text-[9px] text-slate-400">
-              {d.date.slice(5)} {/* MM-DD */}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+type Tab = "overview" | "users" | "usage" | "payments";
 
-// ────────────────────────────────────────────────────────────────────────────
-// Plan distribution (horizontal bars)
-// ────────────────────────────────────────────────────────────────────────────
-
-const PLAN_COLORS: Record<string, string> = {
-  free:  "bg-slate-400",
-  basic: "bg-blue-500",
-  pro:   "bg-violet-500",
-  admin: "bg-rose-500",
-};
-
-function PlanDistribution({ dist, total }: { dist: Record<string, number>; total: number }) {
-  return (
-    <div className="space-y-2">
-      {Object.entries(dist).map(([plan, count]) => {
-        const pct = total ? Math.round((count / total) * 100) : 0;
-        return (
-          <div key={plan}>
-            <div className="mb-1 flex justify-between text-xs text-slate-600">
-              <span className="capitalize font-medium">{plan}</span>
-              <span>{count}명 ({pct}%)</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={`h-full rounded-full ${PLAN_COLORS[plan] ?? "bg-slate-300"}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Stats tab
-// ────────────────────────────────────────────────────────────────────────────
-
-function StatsTab({ stats }: { stats: AdminStats | null }) {
-  if (!stats) {
-    return (
-      <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-32 animate-pulse rounded-2xl bg-slate-100" />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* KPI cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs text-slate-500">총 가입자</p>
-          <p className="mt-1 text-3xl font-bold text-slate-800">
-            {stats.total_users.toLocaleString("ko-KR")}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-xs text-slate-500">플랜 분포</p>
-          <PlanDistribution dist={stats.plan_distribution} total={stats.total_users} />
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-xs text-slate-500">최근 7일 API 사용량</p>
-          <BarChart data={stats.daily_usage} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Users tab
-// ────────────────────────────────────────────────────────────────────────────
-
-const PLAN_BADGE: Record<Plan, string> = {
-  free:  "bg-slate-100 text-slate-600",
-  basic: "bg-blue-100 text-blue-700",
-  pro:   "bg-violet-100 text-violet-700",
-  admin: "bg-rose-100 text-rose-700",
-};
-
-function UsersTab() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState<string | null>(null);
-
-  useEffect(() => {
-    getAdminUsers()
-      .then(setUsers)
-      .catch(() => null)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleDelete = async (id: string, email: string) => {
-    if (!confirm(`${email} 계정을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.`)) return;
-    setDeleting(id);
-    try {
-      await deleteAdminUser(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-    } catch { /* ignore */ } finally {
-      setDeleting(null);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500">
-            <th className="px-4 py-3">이메일</th>
-            <th className="px-4 py-3">플랜</th>
-            <th className="px-4 py-3">수집</th>
-            <th className="px-4 py-3">설문</th>
-            <th className="px-4 py-3">요약</th>
-            <th className="px-4 py-3">가입일</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {users.map((u) => (
-            <tr key={u.id} className="hover:bg-slate-50">
-              <td className="px-4 py-3 font-medium text-slate-800">{u.email}</td>
-              <td className="px-4 py-3">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PLAN_BADGE[u.plan]}`}>
-                  {u.plan}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-slate-600">{u.monthly_usage.research_count}</td>
-              <td className="px-4 py-3 text-slate-600">{u.monthly_usage.survey_count}</td>
-              <td className="px-4 py-3 text-slate-600">{u.monthly_usage.summary_count}</td>
-              <td className="px-4 py-3 text-slate-500">
-                {new Date(u.created_at).toLocaleDateString("ko-KR")}
-              </td>
-              <td className="px-4 py-3">
-                <button
-                  onClick={() => handleDelete(u.id, u.email)}
-                  disabled={deleting === u.id}
-                  className="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                >
-                  {deleting === u.id ? "…" : "삭제"}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {users.length === 0 && (
-        <p className="py-10 text-center text-sm text-slate-400">유저가 없습니다.</p>
-      )}
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Admin page
-// ────────────────────────────────────────────────────────────────────────────
-
-type Tab = "stats" | "users";
+const TABS: Array<{ id: Tab; label: string; icon: string; desc: string }> = [
+  { id: "overview", label: "개요", icon: "📊", desc: "KPI 및 플랜 분포" },
+  { id: "users", label: "유저", icon: "👥", desc: "검색/관리" },
+  { id: "usage", label: "사용량", icon: "📡", desc: "API 호출 추적" },
+  { id: "payments", label: "결제", icon: "💳", desc: "결제 내역" },
+];
 
 export default function AdminPage() {
   return (
@@ -254,52 +115,96 @@ export default function AdminPage() {
 }
 
 function AdminContent() {
-  const [tab, setTab] = useState<Tab>("stats");
-  const [stats, setStats] = useState<AdminStats | null>(null);
-
-  useEffect(() => {
-    getAdminStats().then(setStats).catch(() => null);
-  }, []);
+  const [tab, setTab] = useState<Tab>("overview");
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
+    <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-sm text-slate-500 hover:text-slate-800">
+            <Link
+              href="/dashboard"
+              className="text-sm text-slate-500 transition hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:text-slate-200"
+            >
               ← 대시보드
             </Link>
-            <h1 className="text-lg font-semibold text-slate-800">관리자</h1>
+            <span className="text-slate-300" aria-hidden="true">
+              /
+            </span>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              관리자 대시보드
+            </h1>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        {/* Tabs */}
-        <div className="mb-6 flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
-          {(
-            [
-              { id: "stats", label: "통계" },
-              { id: "users", label: "유저" },
-            ] as const
-          ).map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
-                tab === id
-                  ? "bg-white text-slate-800 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        {/* 탭 네비게이션 */}
+        <nav
+          aria-label="관리자 섹션"
+          role="tablist"
+          className="mb-6 flex flex-wrap gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+        >
+          {TABS.map(({ id, label, icon, desc }) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`tab-${id}`}
+                aria-selected={active}
+                aria-controls={`panel-${id}`}
+                tabIndex={active ? 0 : -1}
+                onClick={() => setTab(id)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    const idx = TABS.findIndex((t) => t.id === id);
+                    const next =
+                      e.key === "ArrowRight"
+                        ? (idx + 1) % TABS.length
+                        : (idx - 1 + TABS.length) % TABS.length;
+                    setTab(TABS[next].id);
+                    const btn = document.getElementById(`tab-${TABS[next].id}`);
+                    btn?.focus();
+                  }
+                }}
+                className={`flex min-w-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  active
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                <span aria-hidden="true">{icon}</span>
+                <span className="flex flex-col items-start leading-tight">
+                  <span>{label}</span>
+                  <span
+                    className={`text-[10px] ${
+                      active ? "text-blue-100" : "text-slate-400 dark:text-slate-500"
+                    }`}
+                  >
+                    {desc}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
 
-        {/* Tab panels */}
-        {tab === "stats" && <StatsTab stats={stats} />}
-        {tab === "users" && <UsersTab />}
+        {/* 탭 패널 */}
+        <div
+          role="tabpanel"
+          id={`panel-${tab}`}
+          aria-labelledby={`tab-${tab}`}
+          tabIndex={0}
+          className="focus:outline-none"
+        >
+          {tab === "overview" && <OverviewTab />}
+          {tab === "users" && <UsersTab />}
+          {tab === "usage" && <UsageTab />}
+          {tab === "payments" && <PaymentsTab />}
+        </div>
       </div>
     </main>
   );

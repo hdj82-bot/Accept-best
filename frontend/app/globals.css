@@ -9,7 +9,8 @@
   --card: #ffffff;
   --card-border: #e2e8f0;
   --muted: #f8fafc;
-  --muted-foreground: #64748b;
+  --muted-foreground: #475569;       /* WCAG AA on #f8fafc: ~7.2:1 */
+  --focus-ring: #2563eb;             /* blue-600 */
 }
 
 /* Dark mode values — toggled by adding .dark to <html> */
@@ -19,7 +20,8 @@
   --card: #1e1e1e;
   --card-border: #2d2d2d;
   --muted: #1a1a1a;
-  --muted-foreground: #94a3b8;
+  --muted-foreground: #cbd5e1;       /* WCAG AA on #1a1a1a: ~10.2:1 */
+  --focus-ring: #60a5fa;             /* blue-400 for dark */
 }
 
 @theme inline {
@@ -33,4 +35,40 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Accessibility: global focus styles (WCAG 2.4.7).
+   Any interactive element that doesn't override focus-visible gets a
+   visible focus ring. Mouse clicks (non-keyboard) don't show the ring.
+   ────────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reduced motion: honor user preference (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* sr-only utility (Tailwind already provides, kept here for explicitness) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
