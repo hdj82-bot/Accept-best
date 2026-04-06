@@ -5,8 +5,10 @@ import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import TagInput from "@/components/TagInput";
 import CollectionPanel from "@/components/CollectionPanel";
+import EmptyState from "@/components/EmptyState";
+import { Skeleton, SkeletonCard } from "@/components/Skeleton";
+import { useCollections, invalidate } from "@/lib/hooks";
 import {
-  getCollections,
   deleteCollection,
   getCollectionPapers,
   getTags,
@@ -38,14 +40,12 @@ interface PaperListPanelProps {
 function PaperListPanel({ collection, onClose }: PaperListPanelProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
-  // Track tags per paper: paperId → string[]
   const [paperTags, setPaperTags] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     getCollectionPapers(collection.id)
       .then((ps) => {
         setPapers(ps);
-        // Initialize tag map with empty arrays
         const init: Record<string, string[]> = {};
         ps.forEach((p) => { init[p.id] = []; });
         setPaperTags(init);
@@ -70,13 +70,19 @@ function PaperListPanel({ collection, onClose }: PaperListPanelProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <aside className="fixed right-0 top-0 z-50 flex h-full w-96 flex-col bg-white shadow-2xl dark:bg-slate-900">
+      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${collection.name} 컬렉션 논문 목록`}
+        className="fixed right-0 top-0 z-50 flex h-full w-96 flex-col bg-white shadow-2xl dark:bg-slate-900"
+      >
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <div className="flex items-center gap-2">
             <span
               className="h-3 w-3 rounded-full"
               style={{ backgroundColor: collection.color ?? "#3b82f6" }}
+              aria-hidden="true"
             />
             <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
               {collection.name}
@@ -85,16 +91,28 @@ function PaperListPanel({ collection, onClose }: PaperListPanelProps) {
               {collection.paper_count}편
             </span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">✕</button>
+          <button
+            onClick={onClose}
+            aria-label="닫기"
+            className="text-slate-400 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-slate-200"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {loading ? (
-            [1, 2, 3].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-            ))
+            <div role="status" aria-busy="true" className="space-y-3">
+              <Skeleton height={80} />
+              <Skeleton height={80} />
+              <Skeleton height={80} />
+            </div>
           ) : papers.length === 0 ? (
-            <p className="text-center text-sm text-slate-400 mt-8">논문이 없습니다.</p>
+            <EmptyState
+              icon="📄"
+              title="논문이 없습니다"
+              description="검색 결과에서 이 컬렉션에 논문을 추가하세요."
+            />
           ) : (
             papers.map((p) => (
               <div
@@ -129,23 +147,16 @@ function PaperListPanel({ collection, onClose }: PaperListPanelProps) {
 // ────────────────────────────────────────────────────────────────────────────
 
 function CollectionsContent() {
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loadingCols, setLoadingCols] = useState(true);
+  const { data: collections, isLoading: loadingCols, error: colsError } = useCollections();
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [tagPapers, setTagPapers] = useState<Paper[]>([]);
   const [loadingTag, setLoadingTag] = useState(false);
 
-  // Which collection's paper list is open
   const [openCollection, setOpenCollection] = useState<Collection | null>(null);
-  // Which paper's "add to collection" panel is open
   const [collectionTargetPaper, setCollectionTargetPaper] = useState<string | null>(null);
 
   useEffect(() => {
-    getCollections()
-      .then(setCollections)
-      .catch(() => null)
-      .finally(() => setLoadingCols(false));
     getTags().then(setTags).catch(() => null);
   }, []);
 
@@ -168,16 +179,15 @@ function CollectionsContent() {
     if (!confirm("이 컬렉션을 삭제하시겠습니까?")) return;
     try {
       await deleteCollection(id);
-      setCollections((cs) => cs.filter((c) => c.id !== id));
+      invalidate("collections");
     } catch { /* ignore */ }
   };
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950">
-      {/* Header */}
       <header className="border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl items-center gap-4">
-          <Link href="/dashboard" className="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+          <Link href="/dashboard" className="text-sm text-slate-500 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-slate-200">
             ← 대시보드
           </Link>
           <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">내 컬렉션</h1>
@@ -186,20 +196,29 @@ function CollectionsContent() {
 
       <div className="mx-auto max-w-5xl px-6 py-8 space-y-10">
 
-        {/* ── Collections grid ── */}
-        <section>
-          <h2 className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">컬렉션</h2>
+        {/* Collections grid */}
+        <section aria-labelledby="collections-heading">
+          <h2 id="collections-heading" className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">컬렉션</h2>
           {loadingCols ? (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-              ))}
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
             </div>
-          ) : collections.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center dark:border-slate-700 dark:bg-slate-900">
-              <p className="text-slate-400 dark:text-slate-500 text-sm">컬렉션이 없습니다.</p>
-              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">논문 검색에서 컬렉션에 추가해보세요.</p>
-            </div>
+          ) : colsError ? (
+            <EmptyState
+              icon="⚠️"
+              tone="error"
+              title="컬렉션을 불러올 수 없습니다"
+              description="네트워크를 확인하고 다시 시도해 주세요."
+            />
+          ) : !collections || collections.length === 0 ? (
+            <EmptyState
+              icon="📁"
+              title="컬렉션이 없습니다"
+              description="논문 검색에서 컬렉션에 추가해 보세요."
+              action={{ label: "논문 검색하러 가기", href: "/research" }}
+            />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               {collections.map((col) => (
@@ -211,14 +230,15 @@ function CollectionsContent() {
                     <span
                       className="h-3.5 w-3.5 rounded-full shrink-0"
                       style={{ backgroundColor: col.color ?? "#3b82f6" }}
+                      aria-hidden="true"
                     />
                     <h3 className="flex-1 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                       {col.name}
                     </h3>
                     <button
                       onClick={() => handleDeleteCollection(col.id)}
-                      className="hidden group-hover:block text-slate-300 hover:text-red-500 text-xs"
-                      aria-label="삭제"
+                      className="hidden group-hover:block text-slate-300 hover:text-red-500 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      aria-label={`${col.name} 삭제`}
                     >
                       ✕
                     </button>
@@ -227,7 +247,7 @@ function CollectionsContent() {
                   <p className="text-xs text-slate-400 dark:text-slate-500">편의 논문</p>
                   <button
                     onClick={() => setOpenCollection(col)}
-                    className="mt-4 rounded-lg border border-slate-200 py-1.5 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+                    className="mt-4 rounded-lg border border-slate-200 py-1.5 text-xs text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
                   >
                     논문 보기 →
                   </button>
@@ -237,16 +257,18 @@ function CollectionsContent() {
           )}
         </section>
 
-        {/* ── Tag cloud ── */}
+        {/* Tag cloud */}
         {tags.length > 0 && (
-          <section>
-            <h2 className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">태그</h2>
-            <div className="flex flex-wrap gap-2">
+          <section aria-labelledby="tags-heading">
+            <h2 id="tags-heading" className="mb-4 text-base font-semibold text-slate-700 dark:text-slate-300">태그</h2>
+            <div className="flex flex-wrap gap-2" role="list" aria-label="태그 목록">
               {tags.map(({ tag, count }) => (
                 <button
                   key={tag}
+                  role="listitem"
                   onClick={() => handleTagClick(tag)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  aria-pressed={activeTag === tag}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                     activeTag === tag
                       ? "border-blue-400 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
                       : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
@@ -258,24 +280,22 @@ function CollectionsContent() {
               ))}
             </div>
 
-            {/* Tag papers */}
             {activeTag && (
               <div className="mt-4">
                 <h3 className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-400">
                   #{activeTag} 논문
                 </h3>
                 {loadingTag ? (
-                  <div className="space-y-2">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-                    ))}
+                  <div className="space-y-2" role="status" aria-busy="true">
+                    <Skeleton height={64} />
+                    <Skeleton height={64} />
                   </div>
                 ) : tagPapers.length === 0 ? (
-                  <p className="text-sm text-slate-400 dark:text-slate-500">논문이 없습니다.</p>
+                  <EmptyState icon="📄" title="해당 태그의 논문이 없습니다" description="다른 태그를 선택해 보세요." />
                 ) : (
-                  <div className="space-y-2">
+                  <ul className="space-y-2" aria-label={`#${activeTag} 태그 논문 목록`}>
                     {tagPapers.map((p) => (
-                      <div
+                      <li
                         key={p.id}
                         className="flex items-start justify-between rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
                       >
@@ -290,13 +310,13 @@ function CollectionsContent() {
                         </div>
                         <button
                           onClick={() => setCollectionTargetPaper(p.id)}
-                          className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-blue-300 hover:text-blue-600 dark:border-slate-600 dark:text-slate-400"
+                          className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-blue-300 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-600 dark:text-slate-400"
                         >
                           + 컬렉션
                         </button>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
             )}
@@ -304,20 +324,12 @@ function CollectionsContent() {
         )}
       </div>
 
-      {/* Paper list slide panel */}
       {openCollection && (
-        <PaperListPanel
-          collection={openCollection}
-          onClose={() => setOpenCollection(null)}
-        />
+        <PaperListPanel collection={openCollection} onClose={() => setOpenCollection(null)} />
       )}
 
-      {/* Add to collection panel */}
       {collectionTargetPaper && (
-        <CollectionPanel
-          paperId={collectionTargetPaper}
-          onClose={() => setCollectionTargetPaper(null)}
-        />
+        <CollectionPanel paperId={collectionTargetPaper} onClose={() => setCollectionTargetPaper(null)} />
       )}
     </main>
   );
