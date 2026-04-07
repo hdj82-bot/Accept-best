@@ -9,10 +9,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# DATABASE_URL 환경변수가 있으면 우선 사용
+# DATABASE_URL 환경변수가 있으면 우선 사용 (asyncpg → 동기 드라이버 변환)
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    sync_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+    config.set_main_option("sqlalchemy.url", sync_url)
 
 target_metadata = None
 
