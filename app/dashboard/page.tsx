@@ -37,17 +37,32 @@ export default async function DashboardPage() {
           <DashboardCard
             title="설문문항 생성"
             description="논문 기반 설문문항을 AI가 자동으로 생성합니다."
-            disabled
+            href="/survey"
           />
           <DashboardCard
             title="논문 건강검진"
             description="작성 중인 논문의 완성도를 AI가 진단합니다."
-            disabled
+            href="/diagnosis"
+          />
+          <DashboardCard
+            title="논문 버전관리"
+            description="논문의 버전을 관리하고 변경 이력을 추적합니다."
+            href="/versions"
           />
           <DashboardCard
             title="연구 노트"
             description="AI 기반 연구 노트를 작성하고 초안으로 변환합니다."
-            disabled
+            href="/notes"
+          />
+          <DashboardCard
+            title="참고문헌 관리"
+            description="참고문헌을 수동 추가하거나 논문에서 자동 추출합니다."
+            href="/references"
+          />
+          <DashboardCard
+            title="연구 공백 발견"
+            description="여러 논문을 분석하여 연구 공백과 후속 연구를 제안합니다."
+            href="/research-gaps"
           />
         </div>
       </main>
