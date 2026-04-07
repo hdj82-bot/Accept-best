@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_S3_BUCKET: str = ""
 
+    # CORS
+    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+
     # 개발 편의
     USE_FIXTURES: bool = True
 

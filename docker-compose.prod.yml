@@ -1,0 +1,21 @@
+services:
+  backend:
+    volumes: []
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+  celery_collect:
+    volumes: []
+
+  celery_process:
+    volumes: []
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: prod
+    volumes: []
+    command: npm run start
+
+  nginx:
+    profiles: []

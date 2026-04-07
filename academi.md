@@ -10,7 +10,7 @@ Claude Code가 세션 시작 시 자동으로 읽는 파일입니다.
 - **서비스명**: 논문집필 도우미 (Research Writing Assistant)
 - **타깃**: 한국 대학교 교수·박사과정 연구자
 - **개발 방식**: 1인 Claude Code 개발, 완성도 우선
-- **현재 단계**: Sprint 0 — 환경 세팅
+- **현재 단계**: Sprint 7 완료 — 베타 배포
 
 ---
 
@@ -218,14 +218,14 @@ USE_FIXTURES=true        # 개발 중 true, 배포 시 false
 
 ## Sprint 진행 현황
 
-- [x] Sprint 0: 환경 세팅 ← **현재 위치**
-- [ ] Sprint 1: 인증 + 플랜 관리
-- [ ] Sprint 2: 논문 수집 파이프라인
-- [ ] Sprint 3: 설문문항 자동 생성 (핵심 차별점)
-- [ ] Sprint 4: 논문 건강검진 + 공유 카드
-- [ ] Sprint 5: 논문 버전 관리 + AI 연구 노트
-- [ ] Sprint 6: 참고문헌 + 연구 공백 발견
-- [ ] Sprint 7: 베타 배포
+- [x] Sprint 0: 환경 세팅
+- [x] Sprint 1: 인증 + 플랜 관리
+- [x] Sprint 2: 논문 수집 파이프라인
+- [x] Sprint 3: 설문문항 자동 생성 (핵심 차별점)
+- [x] Sprint 4: 논문 건강검진 + 공유 카드
+- [x] Sprint 5: 논문 버전 관리 + AI 연구 노트
+- [x] Sprint 6: 참고문헌 + 연구 공백 발견
+- [x] Sprint 7: 베타 배포 ← **완료**
 
 ---
 
