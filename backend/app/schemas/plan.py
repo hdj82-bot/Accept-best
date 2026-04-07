@@ -5,7 +5,7 @@ class PlanLimit(BaseModel):
     research_count: int
     survey_count: int
     summary_count: int
-    diagnosis_count: int
+    healthcheck_count: int
 
 
 class PlanInfo(BaseModel):
