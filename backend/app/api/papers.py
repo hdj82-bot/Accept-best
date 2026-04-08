@@ -22,10 +22,12 @@ async def search_papers_get(
     from app.tasks.collect import collect_papers
 
     # 동기 실행으로 논문 수집
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         collect_papers(keyword, "all", per_page)
-    except Exception:
-        pass  # 수집 실패해도 기존 DB 결과 반환
+    except Exception as e:
+        logger.exception("논문 수집 실패: %s", e)
 
     # DB에서 결과 조회
     offset = (page - 1) * per_page
