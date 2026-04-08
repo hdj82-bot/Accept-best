@@ -1,14 +1,13 @@
 import json
 
-from anthropic import AsyncAnthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import ExternalAPIError
 from app.models.paper import Paper
+from app.services.gemini_client import get_gemini_client
 
-_client: AsyncAnthropic | None = None
+MODEL = "gemini-3-flash-preview"
 
 SYSTEM_PROMPT = """당신은 학술 연구 동향 분석 전문가입니다.
 주어진 여러 논문의 제목과 초록을 비교 분석하여 연구 공백, 연결점, 후속 연구 제안을 도출하세요.
@@ -42,20 +41,12 @@ SYSTEM_PROMPT = """당신은 학술 연구 동향 분석 전문가입니다.
 - related_papers, papers 필드에는 반드시 입력된 paper_id를 사용"""
 
 
-def _get_client() -> AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _client
-
-
 async def find_research_gaps(
     paper_ids: list[str],
     user_id: str,
     db: AsyncSession,
 ) -> dict:
     """여러 논문을 비교 분석하여 연구 공백과 연결점을 발견한다."""
-    # 논문 조회
     result = await db.execute(
         select(Paper).where(Paper.id.in_(paper_ids))
     )
@@ -64,28 +55,25 @@ async def find_research_gaps(
     if len(papers) < 2:
         raise ValueError("At least 2 papers are required")
 
-    # Claude API에 전달할 논문 정보 구성
     papers_text = ""
     for p in papers:
         papers_text += f"\n---\nPaper ID: {p.id}\n제목: {p.title}\n초록: {p.abstract or '(초록 없음)'}\n"
 
-    client = _get_client()
+    client = get_gemini_client()
 
     try:
-        message = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": papers_text}],
+        response = await client.aio.models.generate_content(
+            model=MODEL,
+            contents=papers_text,
+            config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 4096},
         )
     except Exception as e:
-        raise ExternalAPIError("Anthropic", str(e))
+        raise ExternalAPIError("Gemini", str(e))
 
     try:
-        raw = message.content[0].text
-        data = json.loads(raw)
-    except (json.JSONDecodeError, IndexError, KeyError) as e:
-        raise ExternalAPIError("Anthropic", f"Invalid response format: {e}")
+        data = json.loads(response.text)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ExternalAPIError("Gemini", f"Invalid response format: {e}")
 
     return {
         "gaps": data.get("gaps", []),

@@ -1,15 +1,14 @@
 import uuid
 
-from anthropic import AsyncAnthropic
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import ExternalAPIError
 from app.models.research_note import ResearchNote
+from app.services.gemini_client import get_gemini_client
 from app.services.paper_version_service import save_version
 
-_client: AsyncAnthropic | None = None
+MODEL = "gemini-3-flash-preview"
 
 DRAFT_SYSTEM_PROMPT = """당신은 학술 논문 작성 전문가입니다.
 주어진 연구 노트를 학술 논문 초안으로 변환하세요.
@@ -33,13 +32,6 @@ DRAFT_SYSTEM_PROMPT = """당신은 학술 논문 작성 전문가입니다.
 - 학술적 문체 사용
 - 각 섹션에 적절한 분량 배분
 - Markdown 형식으로 작성"""
-
-
-def _get_client() -> AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _client
 
 
 async def create_note(
@@ -132,29 +124,27 @@ async def convert_note_to_draft(
     user_id: str,
     db: AsyncSession,
 ) -> str:
-    """연구 노트를 Claude API로 학술 논문 초안으로 변환하고 auto 버전으로 저장한다."""
+    """연구 노트를 Gemini API로 학술 논문 초안으로 변환하고 auto 버전으로 저장한다."""
     note = await get_note(note_id, user_id, db)
     if note is None:
         raise ValueError("Note not found")
 
-    client = _get_client()
+    client = get_gemini_client()
 
     try:
-        message = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=DRAFT_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": note.content}],
+        response = await client.aio.models.generate_content(
+            model=MODEL,
+            contents=note.content,
+            config={"system_instruction": DRAFT_SYSTEM_PROMPT, "max_output_tokens": 4096},
         )
     except Exception as e:
-        raise ExternalAPIError("Anthropic", str(e))
+        raise ExternalAPIError("Gemini", str(e))
 
     try:
-        draft_text = message.content[0].text
-    except (IndexError, AttributeError) as e:
-        raise ExternalAPIError("Anthropic", f"Invalid response format: {e}")
+        draft_text = response.text
+    except (ValueError, AttributeError) as e:
+        raise ExternalAPIError("Gemini", f"Invalid response format: {e}")
 
-    # auto 버전으로 저장 (10개 초과 시 자동 정리)
     await save_version(
         user_id=user_id,
         content={"source": "note_to_draft", "note_id": note_id, "draft": draft_text},

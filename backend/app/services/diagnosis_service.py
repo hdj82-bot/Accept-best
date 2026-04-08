@@ -1,15 +1,14 @@
 import json
 import uuid
 
-from anthropic import AsyncAnthropic
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import ExternalAPIError
 from app.models.diagnosis import Diagnosis
+from app.services.gemini_client import get_gemini_client
 
-_client: AsyncAnthropic | None = None
+MODEL = "gemini-3-flash-preview"
 
 SYSTEM_PROMPT = """당신은 학술 논문 품질 진단 전문가입니다.
 주어진 논문 제목과 초록을 분석하여 논문 건강검진 결과를 생성하세요.
@@ -18,32 +17,13 @@ SYSTEM_PROMPT = """당신은 학술 논문 품질 진단 전문가입니다.
 {
   "overall_score": 75,
   "sections": {
-    "research_purpose": {
-      "score": 80,
-      "feedback": "연구목적 명확성에 대한 피드백"
-    },
-    "methodology": {
-      "score": 70,
-      "feedback": "방법론 적절성에 대한 피드백"
-    },
-    "logic_structure": {
-      "score": 75,
-      "feedback": "논리 구조에 대한 피드백"
-    },
-    "literature_use": {
-      "score": 65,
-      "feedback": "문헌 활용에 대한 피드백"
-    },
-    "conclusion": {
-      "score": 80,
-      "feedback": "결론 타당성에 대한 피드백"
-    }
+    "research_purpose": {"score": 80, "feedback": "연구목적 명확성에 대한 피드백"},
+    "methodology": {"score": 70, "feedback": "방법론 적절성에 대한 피드백"},
+    "logic_structure": {"score": 75, "feedback": "논리 구조에 대한 피드백"},
+    "literature_use": {"score": 65, "feedback": "문헌 활용에 대한 피드백"},
+    "conclusion": {"score": 80, "feedback": "결론 타당성에 대한 피드백"}
   },
-  "recommendations": [
-    "구체적인 개선 권장사항 1",
-    "구체적인 개선 권장사항 2",
-    "구체적인 개선 권장사항 3"
-  ]
+  "recommendations": ["구체적인 개선 권장사항 1", "구체적인 개선 권장사항 2", "구체적인 개선 권장사항 3"]
 }
 
 규칙:
@@ -53,13 +33,6 @@ SYSTEM_PROMPT = """당신은 학술 논문 품질 진단 전문가입니다.
 - 초록만으로 판단이 어려운 항목은 보수적으로 평가하되 이유를 feedback에 명시"""
 
 
-def _get_client() -> AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _client
-
-
 async def diagnose_paper(
     paper_id: str,
     title: str,
@@ -67,25 +40,23 @@ async def diagnose_paper(
     user_id: str,
     db: AsyncSession,
 ) -> Diagnosis:
-    """Claude API로 논문 건강검진을 수행하고 결과를 DB에 저장한다."""
-    client = _get_client()
+    """Gemini API로 논문 건강검진을 수행하고 결과를 DB에 저장한다."""
+    client = get_gemini_client()
     user_content = f"제목: {title}\n\n초록: {abstract}"
 
     try:
-        message = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
+        response = await client.aio.models.generate_content(
+            model=MODEL,
+            contents=user_content,
+            config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 2048},
         )
     except Exception as e:
-        raise ExternalAPIError("Anthropic", str(e))
+        raise ExternalAPIError("Gemini", str(e))
 
     try:
-        raw = message.content[0].text
-        data = json.loads(raw)
-    except (json.JSONDecodeError, IndexError, KeyError) as e:
-        raise ExternalAPIError("Anthropic", f"Invalid response format: {e}")
+        data = json.loads(response.text)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ExternalAPIError("Gemini", f"Invalid response format: {e}")
 
     diagnosis = Diagnosis(
         id=str(uuid.uuid4()),

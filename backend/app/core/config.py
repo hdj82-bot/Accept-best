@@ -9,9 +9,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
 
-    # AI API
-    OPENAI_API_KEY: str = ""
-    ANTHROPIC_API_KEY: str = ""
+    # AI API (Gemini 통합)
     GEMINI_API_KEY: str = ""
 
     # 번역

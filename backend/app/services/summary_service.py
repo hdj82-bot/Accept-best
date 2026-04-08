@@ -1,10 +1,10 @@
-from anthropic import AsyncAnthropic
+import json
 
-from app.core.config import settings
 from app.core.exceptions import ExternalAPIError
 from app.schemas.summary import SummaryRead
+from app.services.gemini_client import get_gemini_client
 
-_client: AsyncAnthropic | None = None
+MODEL = "gemini-3-flash-preview"
 
 SYSTEM_PROMPT = """당신은 학술 논문 분석 전문가입니다.
 주어진 논문 제목과 초록을 분석하여 아래 형식의 JSON만 반환하세요. 다른 텍스트는 포함하지 마세요.
@@ -17,35 +17,24 @@ SYSTEM_PROMPT = """당신은 학술 논문 분석 전문가입니다.
 }"""
 
 
-def _get_client() -> AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _client
-
-
 async def summarize_paper(paper_id: str, title: str, abstract: str) -> SummaryRead:
-    """Claude API로 논문 초록을 한국어 요약."""
-    client = _get_client()
+    """Gemini API로 논문 초록을 한국어 요약."""
+    client = get_gemini_client()
     user_content = f"제목: {title}\n\n초록: {abstract}"
 
     try:
-        message = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
+        response = await client.aio.models.generate_content(
+            model=MODEL,
+            contents=user_content,
+            config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 1024},
         )
     except Exception as e:
-        raise ExternalAPIError("Anthropic", str(e))
-
-    import json
+        raise ExternalAPIError("Gemini", str(e))
 
     try:
-        raw = message.content[0].text
-        data = json.loads(raw)
-    except (json.JSONDecodeError, IndexError, KeyError) as e:
-        raise ExternalAPIError("Anthropic", f"Invalid response format: {e}")
+        data = json.loads(response.text)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ExternalAPIError("Gemini", f"Invalid response format: {e}")
 
     return SummaryRead(
         paper_id=paper_id,
