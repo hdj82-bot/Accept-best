@@ -16,7 +16,7 @@ from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
 
-ARXIV_API_URL = "http://export.arxiv.org/api/query"
+ARXIV_API_URL = "https://export.arxiv.org/api/query"
 SS_API_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 
 
