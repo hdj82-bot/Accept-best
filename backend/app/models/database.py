@@ -10,7 +10,11 @@ if settings.DATABASE_URL and "neon.tech" in settings.DATABASE_URL:
     _connect_args = {"ssl": True}
 
 engine = create_async_engine(
-    settings.DATABASE_URL, echo=False, connect_args=_connect_args
+    settings.DATABASE_URL,
+    echo=False,
+    connect_args=_connect_args,
+    pool_recycle=300,
+    pool_pre_ping=True,
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
