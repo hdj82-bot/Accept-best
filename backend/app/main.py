@@ -39,16 +39,16 @@ app.add_middleware(
 # 에러 핸들러
 app.add_exception_handler(AppError, app_error_handler)
 
-# 라우터
+# 라우터 — /api prefix로 통합
 app.include_router(health_router)
-app.include_router(auth_router)
-app.include_router(users_router)
-app.include_router(plans_router)
-app.include_router(papers_router)
-app.include_router(survey_router)
-app.include_router(diagnosis_router)
-app.include_router(share_router)
-app.include_router(versions_router)
-app.include_router(notes_router)
-app.include_router(references_router)
-app.include_router(research_gaps_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(users_router, prefix="/api")
+app.include_router(plans_router, prefix="/api")
+app.include_router(papers_router, prefix="/api")
+app.include_router(survey_router, prefix="/api")
+app.include_router(diagnosis_router, prefix="/api")
+app.include_router(share_router, prefix="/api")
+app.include_router(versions_router, prefix="/api")
+app.include_router(notes_router, prefix="/api")
+app.include_router(references_router, prefix="/api")
+app.include_router(research_gaps_router, prefix="/api")
