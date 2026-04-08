@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import { encode } from "next-auth/jwt";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -25,6 +26,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token.sub) {
         session.user.id = token.sub;
       }
+      // JWT를 인코딩하여 accessToken으로 전달 (FastAPI에서 HS256 검증)
+      const accessToken = await encode({
+        token,
+        secret: process.env.NEXTAUTH_SECRET!,
+      });
+      (session as any).accessToken = accessToken;
       return session;
     },
   },
