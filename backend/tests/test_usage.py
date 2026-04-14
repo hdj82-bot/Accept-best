@@ -39,7 +39,7 @@ async def test_get_usage_returns_current_month(db_session: AsyncSession):
         research_count=3,
         survey_count=1,
         summary_count=0,
-        diagnosis_count=0,
+        healthcheck_count=0,
     )
     db_session.add(row)
     await db_session.flush()
@@ -59,7 +59,7 @@ async def test_get_usage_ignores_other_months(db_session: AsyncSession):
         research_count=99,
         survey_count=0,
         summary_count=0,
-        diagnosis_count=0,
+        healthcheck_count=0,
     )
     db_session.add(row)
     await db_session.flush()
@@ -89,7 +89,7 @@ async def test_check_quota_raises_when_at_limit(db_session: AsyncSession):
         research_count=5,  # free 한도 = 5
         survey_count=0,
         summary_count=0,
-        diagnosis_count=0,
+        healthcheck_count=0,
     )
     db_session.add(row)
     await db_session.flush()
@@ -108,7 +108,7 @@ async def test_check_quota_pro_never_raises(db_session: AsyncSession):
         research_count=9999,
         survey_count=0,
         summary_count=0,
-        diagnosis_count=0,
+        healthcheck_count=0,
     )
     db_session.add(row)
     await db_session.flush()

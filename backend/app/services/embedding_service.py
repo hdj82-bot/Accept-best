@@ -1,36 +1,27 @@
-from openai import AsyncOpenAI
+from google.genai import types
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import ExternalAPIError
 from app.models.paper import Paper
+from app.services.gemini_client import get_gemini_client
 
-EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIM = 1536
-
-_client: AsyncOpenAI | None = None
-
-
-def _get_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        _client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    return _client
 
 
 async def create_embedding(text: str) -> list[float]:
     """텍스트로부터 1536차원 임베딩 벡터 생성."""
-    client = _get_client()
+    client = get_gemini_client()
     try:
-        response = await client.embeddings.create(
+        result = await client.aio.models.embed_content(
             model=EMBEDDING_MODEL,
-            input=text,
-            dimensions=EMBEDDING_DIM,
+            contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
         )
-        return response.data[0].embedding
+        return list(result.embeddings[0].values)
     except Exception as e:
-        raise ExternalAPIError("OpenAI", str(e))
+        raise ExternalAPIError("Gemini", str(e))
 
 
 async def embed_and_save(paper_id: str, text: str, db: AsyncSession) -> list[float]:

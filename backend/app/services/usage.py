@@ -12,7 +12,7 @@ PLAN_LIMITS: dict[str, dict[str, int]] = {
         "research_count": 5,
         "survey_count": 3,
         "summary_count": 10,
-        "diagnosis_count": 2,
+        "healthcheck_count": 2,
         "translation_count": 3,
         "expression_count": 10,
     },
@@ -20,7 +20,7 @@ PLAN_LIMITS: dict[str, dict[str, int]] = {
         "research_count": 30,
         "survey_count": 20,
         "summary_count": 50,
-        "diagnosis_count": 10,
+        "healthcheck_count": 10,
         "translation_count": 20,
         "expression_count": 50,
     },
@@ -28,7 +28,7 @@ PLAN_LIMITS: dict[str, dict[str, int]] = {
         "research_count": -1,
         "survey_count": -1,
         "summary_count": -1,
-        "diagnosis_count": -1,
+        "healthcheck_count": -1,
         "translation_count": -1,
         "expression_count": -1,
     },
@@ -36,7 +36,7 @@ PLAN_LIMITS: dict[str, dict[str, int]] = {
 
 ALLOWED_FIELDS = {
     "research_count", "survey_count", "summary_count",
-    "diagnosis_count", "translation_count", "expression_count",
+    "healthcheck_count", "translation_count", "expression_count",
 }
 
 

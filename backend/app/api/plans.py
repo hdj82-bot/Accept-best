@@ -57,7 +57,7 @@ async def get_my_usage(
         "research_count": usage_row.research_count if usage_row else 0,
         "survey_count": usage_row.survey_count if usage_row else 0,
         "summary_count": usage_row.summary_count if usage_row else 0,
-        "diagnosis_count": usage_row.diagnosis_count if usage_row else 0,
+        "healthcheck_count": usage_row.healthcheck_count if usage_row else 0,
     }
 
     limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
