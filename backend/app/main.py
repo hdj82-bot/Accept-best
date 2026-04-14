@@ -1,8 +1,12 @@
 import sentry_sdk
 from fastapi import FastAPI
 
+from app.api.diagnosis import router as diagnosis_router
+from app.api.expressions import router as expressions_router
 from app.api.health import router as health_router
+from app.api.papers import router as papers_router
 from app.api.plans import router as plans_router
+from app.api.translation import router as translation_router
 from app.core.config import settings
 from app.core.exceptions import AppError, app_error_handler
 
@@ -21,4 +25,8 @@ app.add_exception_handler(AppError, app_error_handler)
 
 # 라우터
 app.include_router(health_router)
+app.include_router(papers_router)
 app.include_router(plans_router)
+app.include_router(diagnosis_router)
+app.include_router(translation_router)
+app.include_router(expressions_router)
