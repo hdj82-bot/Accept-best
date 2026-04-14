@@ -2,6 +2,7 @@ import sentry_sdk
 from fastapi import FastAPI
 
 from app.api.health import router as health_router
+from app.api.plans import router as plans_router
 from app.core.config import settings
 from app.core.exceptions import AppError, app_error_handler
 
@@ -20,3 +21,4 @@ app.add_exception_handler(AppError, app_error_handler)
 
 # 라우터
 app.include_router(health_router)
+app.include_router(plans_router)
