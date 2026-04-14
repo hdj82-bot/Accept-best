@@ -10,6 +10,8 @@ celery[redis]==5.5.2
 redis==5.3.0
 sentry-sdk[fastapi]==2.26.1
 httpx==0.28.1
+openai==1.82.0
+anthropic==0.52.0
 
 # dev / test
 pytest==8.3.5
