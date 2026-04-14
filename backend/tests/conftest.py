@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from httpx import ASIOTransport, AsyncClient
+from httpx import ASGITransport, AsyncClient
+from jose import jwt
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -11,11 +12,17 @@ from app.core.config import settings
 from app.main import app
 from app.models.database import Base, get_db
 
-# 테스트 DB URL (메인 DB 이름 뒤에 _test 붙이기)
+# 테스트 DB URL
 TEST_DATABASE_URL = settings.DATABASE_URL.replace("/academi", "/academi_test")
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+# JWT 테스트 상수
+NEXTAUTH_SECRET = "test-secret-key-for-pytest"
+ALGORITHM = "HS256"
+TEST_USER_ID = "test-user-001"
+TEST_EMAIL = "test@example.com"
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -46,7 +53,7 @@ async def client(db_session: AsyncSession):
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    transport = ASIOTransport(app=app)
+    transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
@@ -72,3 +79,22 @@ async def seeded_papers(db_session: AsyncSession, paper_fixtures: list[dict]):
         papers.append(paper)
     await db_session.flush()
     return papers
+
+
+@pytest.fixture
+def auth_token() -> str:
+    """테스트용 JWT 토큰을 생성한다."""
+    payload = {"sub": TEST_USER_ID, "email": TEST_EMAIL}
+    return jwt.encode(payload, NEXTAUTH_SECRET, algorithm=ALGORITHM)
+
+
+@pytest.fixture
+def auth_headers(auth_token: str) -> dict:
+    """Authorization 헤더를 반환한다."""
+    return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture
+def invalid_auth_headers() -> dict:
+    """잘못된 토큰이 담긴 헤더."""
+    return {"Authorization": "Bearer invalid.token.here"}

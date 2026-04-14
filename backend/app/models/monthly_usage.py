@@ -17,6 +17,6 @@ class MonthlyUsage(Base):
     research_count: Mapped[int] = mapped_column(Integer, default=0)
     survey_count: Mapped[int] = mapped_column(Integer, default=0)
     summary_count: Mapped[int] = mapped_column(Integer, default=0)
-    diagnosis_count: Mapped[int] = mapped_column(Integer, default=0)
+    healthcheck_count: Mapped[int] = mapped_column(Integer, default=0)
     translation_count: Mapped[int] = mapped_column(Integer, default=0)
     expression_count: Mapped[int] = mapped_column(Integer, default=0)
