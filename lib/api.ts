@@ -1,4 +1,14 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// production 빌드에서 NEXT_PUBLIC_API_URL 누락 시 silent fallback이 아니라 즉시 빌드 실패시킨다.
+// 누락된 채로 배포되면 모든 API 호출이 localhost:8000으로 가서 production 디버깅이 어려워진다.
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production"
+    ? (() => {
+        throw new Error(
+          "NEXT_PUBLIC_API_URL 환경변수가 production 빌드에 없음. Vercel 프로젝트 설정에서 등록 필요.",
+        );
+      })()
+    : "http://localhost:8000");
 
 export interface Paper {
   id: string;
