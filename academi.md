@@ -18,8 +18,9 @@ Claude Code가 세션 시작 시 자동으로 읽는 파일입니다.
 ## 확정된 아키텍처 결정사항 (절대 변경 금지)
 
 ### 임베딩 모델
-- **모델**: `text-embedding-3-small` (OpenAI)
+- **모델**: `gemini-embedding-001` (Google Gemini API, `google-genai` SDK)
 - **차원**: `vector(1536)` — 이미 DB 스키마에 반영됨
+- **차원 고정**: `embed_content` 호출 시 `output_dimensionality=1536` 명시 (Matryoshka — 768/1536/3072 중 1536 선택)
 - **절대 변경 불가**: 바꾸면 전체 papers 테이블 재임베딩 필요
 
 ### 인증 구조
@@ -193,9 +194,7 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
 # AI API
-OPENAI_API_KEY=          # text-embedding-3-small 전용
-ANTHROPIC_API_KEY=       # Claude API
-GEMINI_API_KEY=          # 나노바나나 이미지 생성
+GEMINI_API_KEY=          # 텍스트 생성 + 임베딩(1536차원) 통합
 
 # 번역 (Phase 2에서 활성화)
 DEEPL_API_KEY=
