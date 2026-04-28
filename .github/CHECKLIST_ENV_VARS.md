@@ -6,20 +6,22 @@
 
 ---
 
-## 0. 자동 검증 결과 요약 (이 문서 작성 시점)
+## 0. 자동 검증 결과 요약 (최종 갱신: 2026-04-28)
 
 | 항목 | 결과 | 근거 |
 |---|---|---|
-| Render 백엔드 `/health` 응답 | ✅ 200 `{"status":"ok"}` | `curl https://academi-ai.onrender.com/health` |
+| Render 백엔드 `/health` 응답 | ✅ 200 `{"status":"ok"}` (2026-04-28 재검증) | `curl https://academi-ai.onrender.com/health` |
 | Render `/api/auth/verify` 무토큰 → 401 `Not authenticated` | ✅ 정상 | 코드 경로 동작 확인 |
 | Render `/api/auth/verify` 잘못된 토큰 → 401 `Invalid token` | ✅ 정상 | python-jose 검증 경로 동작 |
 | Render CORS — `Origin: http://localhost:3000` preflight | ✅ 200, `Access-Control-Allow-Origin` 응답 | 기본값 동작 |
-| Render CORS — `Origin: https://academi-8jd5bvxja-hdj82-bots-projects.vercel.app` preflight | ❌ **400, Allow-Origin 미응답** | **CORS_ORIGINS에 production Vercel 도메인 미등록 — 즉시 조치 필요** |
+| Render CORS — `Origin: https://academi.vercel.app` preflight | ✅ 200, `access-control-allow-origin: https://academi.vercel.app` (2026-04-28 검증) | stable alias 등록 완료 |
+| Render CORS — `Origin: https://academi-ai.vercel.app` preflight | ✅ 200, `access-control-allow-origin: https://academi-ai.vercel.app` (2026-04-28 검증) | stable alias 등록 완료 |
+| Render CORS — deployment-specific URL(`academi-XXXX-...vercel.app`) preflight | ⚠ 400 (의도) | stable alias만 등록하는 정책(§2.3) — deployment-specific URL은 매 배포마다 바뀌므로 미등록이 정상 |
 | Vercel production URL 외부 접근 | ⚠ 401 (Vercel Deployment Protection 활성) | SSO 벽 뒤라 무인증 사용자 접근 불가. 의도된 것이면 OK, 일반 공개 서비스라면 해제 필요 |
 | `NEXTAUTH_SECRET` Vercel ↔ Render byte-exact 일치 | ⚠ 사용자 수동 확인 | 외부에서 검증 불가 |
 | Vercel `NEXT_PUBLIC_API_URL` 실제 등록 여부 | ⚠ 사용자 수동 확인 | 빌드된 클라이언트 번들을 봐야 가능 |
 
-**요점**: 자동 검증으로 확인된 production 차단 이슈 1건 — Render `CORS_ORIGINS` 누락. §2.4 절차 따라 조치하세요.
+**요점**: 2026-04-28 기준 production stable alias(`academi.vercel.app`, `academi-ai.vercel.app`) CORS 등록 완료 — 자동 검증으로 확인된 production 차단 이슈는 모두 해소. 남은 사용자 수동 검증 항목 2건(`NEXTAUTH_SECRET` byte-exact, `NEXT_PUBLIC_API_URL` 빌드타임 임베드) + 정책 결정 1건(Vercel Deployment Protection)만 남음.
 
 ---
 
