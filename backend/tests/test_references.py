@@ -35,7 +35,7 @@ class FakeReference:
 
 @pytest.mark.asyncio
 async def test_create_reference_requires_auth(client: AsyncClient):
-    resp = await client.post("/references", json={"title": "test"})
+    resp = await client.post("/api/references", json={"title": "test"})
     assert resp.status_code == 401
 
 
@@ -48,7 +48,7 @@ async def test_create_reference_success(client: AsyncClient, auth_headers: dict)
         return_value=fake,
     ):
         resp = await client.post(
-            "/references",
+            "/api/references",
             json={"paper_id": fake.paper_id, "title": "Attention Is All You Need"},
             headers=auth_headers,
         )
@@ -66,7 +66,7 @@ async def test_create_reference_success(client: AsyncClient, auth_headers: dict)
 
 @pytest.mark.asyncio
 async def test_list_references_requires_auth(client: AsyncClient):
-    resp = await client.get("/references")
+    resp = await client.get("/api/references")
     assert resp.status_code == 401
 
 
@@ -77,7 +77,7 @@ async def test_list_references_empty(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=([], 0),
     ):
-        resp = await client.get("/references", headers=auth_headers)
+        resp = await client.get("/api/references", headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -94,7 +94,7 @@ async def test_list_references_with_paper_id(client: AsyncClient, auth_headers: 
         return_value=([], 0),
     ) as mock_list:
         resp = await client.get(
-            f"/references?paper_id={fake_paper_id}", headers=auth_headers,
+            f"/api/references?paper_id={fake_paper_id}", headers=auth_headers,
         )
 
     assert resp.status_code == 200
@@ -110,7 +110,7 @@ async def test_list_references_with_paper_id(client: AsyncClient, auth_headers: 
 
 @pytest.mark.asyncio
 async def test_get_reference_requires_auth(client: AsyncClient):
-    resp = await client.get(f"/references/{uuid.uuid4()}")
+    resp = await client.get(f"/api/references/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -121,7 +121,7 @@ async def test_get_reference_not_found(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.get(f"/references/{uuid.uuid4()}", headers=auth_headers)
+        resp = await client.get(f"/api/references/{uuid.uuid4()}", headers=auth_headers)
 
     assert resp.status_code == 404
     assert "Reference not found" in resp.json()["detail"]
@@ -135,7 +135,7 @@ async def test_get_reference_success(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=fake,
     ):
-        resp = await client.get(f"/references/{fake.id}", headers=auth_headers)
+        resp = await client.get(f"/api/references/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 200
     assert resp.json()["id"] == fake.id
@@ -148,7 +148,7 @@ async def test_get_reference_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_update_reference_requires_auth(client: AsyncClient):
-    resp = await client.put(f"/references/{uuid.uuid4()}", json={"title": "new"})
+    resp = await client.put(f"/api/references/{uuid.uuid4()}", json={"title": "new"})
     assert resp.status_code == 401
 
 
@@ -160,7 +160,7 @@ async def test_update_reference_not_found(client: AsyncClient, auth_headers: dic
         return_value=None,
     ):
         resp = await client.put(
-            f"/references/{uuid.uuid4()}",
+            f"/api/references/{uuid.uuid4()}",
             json={"title": "updated"},
             headers=auth_headers,
         )
@@ -178,7 +178,7 @@ async def test_update_reference_success(client: AsyncClient, auth_headers: dict)
         return_value=fake,
     ):
         resp = await client.put(
-            f"/references/{fake.id}",
+            f"/api/references/{fake.id}",
             json={"title": "Updated Title"},
             headers=auth_headers,
         )
@@ -194,7 +194,7 @@ async def test_update_reference_success(client: AsyncClient, auth_headers: dict)
 
 @pytest.mark.asyncio
 async def test_delete_reference_requires_auth(client: AsyncClient):
-    resp = await client.delete(f"/references/{uuid.uuid4()}")
+    resp = await client.delete(f"/api/references/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -205,7 +205,7 @@ async def test_delete_reference_not_found(client: AsyncClient, auth_headers: dic
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.delete(f"/references/{uuid.uuid4()}", headers=auth_headers)
+        resp = await client.delete(f"/api/references/{uuid.uuid4()}", headers=auth_headers)
 
     assert resp.status_code == 404
 
@@ -221,7 +221,7 @@ async def test_delete_reference_success(client: AsyncClient, auth_headers: dict)
         "app.api.references.delete_reference",
         new_callable=AsyncMock,
     ) as mock_del:
-        resp = await client.delete(f"/references/{fake.id}", headers=auth_headers)
+        resp = await client.delete(f"/api/references/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 200
     assert resp.json()["message"] == "삭제되었습니다"
@@ -235,7 +235,7 @@ async def test_delete_reference_success(client: AsyncClient, auth_headers: dict)
 
 @pytest.mark.asyncio
 async def test_extract_requires_auth(client: AsyncClient):
-    resp = await client.post("/references/extract", json={"paper_id": str(uuid.uuid4())})
+    resp = await client.post("/api/references/extract", json={"paper_id": str(uuid.uuid4())})
     assert resp.status_code == 401
 
 
@@ -250,7 +250,7 @@ async def test_extract_paper_not_found(
 
     token = make_token(user_id)
     resp = await client.post(
-        "/references/extract",
+        "/api/references/extract",
         json={"paper_id": str(uuid.uuid4())},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -274,7 +274,7 @@ async def test_extract_success(
          patch("app.api.references.check_quota", new_callable=AsyncMock) as mock_quota, \
          patch("app.api.references.increment_usage", new_callable=AsyncMock) as mock_incr:
         resp = await client.post(
-            "/references/extract",
+            "/api/references/extract",
             json={"paper_id": paper_id},
             headers={"Authorization": f"Bearer {token}"},
         )

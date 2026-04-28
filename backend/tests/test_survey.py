@@ -23,7 +23,7 @@ def make_token(user_id: str) -> str:
 
 @pytest.mark.asyncio
 async def test_generate_survey_requires_auth(client: AsyncClient):
-    resp = await client.post("/survey/generate", json={"paper_id": "any"})
+    resp = await client.post("/api/survey/generate", json={"paper_id": "any"})
     assert resp.status_code == 401
 
 
@@ -38,7 +38,7 @@ async def test_generate_survey_paper_not_found(
 
     token = make_token(user_id)
     resp = await client.post(
-        "/survey/generate",
+        "/api/survey/generate",
         json={"paper_id": str(uuid.uuid4())},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -61,7 +61,7 @@ async def test_generate_survey_success(
     with patch("app.api.survey.check_quota", new_callable=AsyncMock) as mock_quota, \
          patch("app.api.survey.increment_usage", new_callable=AsyncMock) as mock_incr:
         resp = await client.post(
-            "/survey/generate",
+            "/api/survey/generate",
             json={"paper_id": paper_id},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -81,7 +81,7 @@ async def test_generate_survey_success(
 
 @pytest.mark.asyncio
 async def test_list_surveys_requires_auth(client: AsyncClient):
-    resp = await client.get("/survey")
+    resp = await client.get("/api/survey")
     assert resp.status_code == 401
 
 
@@ -92,7 +92,7 @@ async def test_list_surveys_empty(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=([], 0),
     ):
-        resp = await client.get("/survey", headers=auth_headers)
+        resp = await client.get("/api/survey", headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -109,7 +109,7 @@ async def test_list_surveys_with_paper_id(client: AsyncClient, auth_headers: dic
         return_value=([], 0),
     ) as mock_list:
         resp = await client.get(
-            f"/survey?paper_id={fake_paper_id}", headers=auth_headers,
+            f"/api/survey?paper_id={fake_paper_id}", headers=auth_headers,
         )
 
     assert resp.status_code == 200
@@ -125,7 +125,7 @@ async def test_list_surveys_with_paper_id(client: AsyncClient, auth_headers: dic
 
 @pytest.mark.asyncio
 async def test_get_survey_requires_auth(client: AsyncClient):
-    resp = await client.get(f"/survey/{uuid.uuid4()}")
+    resp = await client.get(f"/api/survey/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -137,7 +137,7 @@ async def test_get_survey_not_found(client: AsyncClient, auth_headers: dict):
         return_value=None,
     ):
         resp = await client.get(
-            f"/survey/{uuid.uuid4()}", headers=auth_headers,
+            f"/api/survey/{uuid.uuid4()}", headers=auth_headers,
         )
 
     assert resp.status_code == 404
@@ -163,7 +163,7 @@ async def test_get_survey_success(client: AsyncClient, auth_headers: dict):
         return_value=FakeQuestion(),
     ):
         resp = await client.get(
-            f"/survey/{survey_id}", headers=auth_headers,
+            f"/api/survey/{survey_id}", headers=auth_headers,
         )
 
     assert resp.status_code == 200
