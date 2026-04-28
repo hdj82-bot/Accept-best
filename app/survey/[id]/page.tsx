@@ -27,7 +27,7 @@ export default async function SurveyDetailPage({
 
   let question;
   try {
-    const token = (session as any).accessToken as string | undefined;
+    const token = session?.accessToken;
     question = await getSurveyQuestion(id, token!);
   } catch {
     notFound();

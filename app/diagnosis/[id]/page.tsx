@@ -28,7 +28,7 @@ export default function DiagnosisDetailPage() {
   const [showShare, setShowShare] = useState(false);
 
   useEffect(() => {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token || !params.id) return;
 
     let cancelled = false;

@@ -38,7 +38,7 @@ export default function NoteDetailPage() {
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token || !params.id) return;
 
     let cancelled = false;
@@ -68,7 +68,7 @@ export default function NoteDetailPage() {
 
   async function handleDelete() {
     if (!note) return;
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) return;
 
     setDeleting(true);
@@ -87,7 +87,7 @@ export default function NoteDetailPage() {
 
   async function handleToDraft() {
     if (!note) return;
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) return;
 
     setConverting(true);
@@ -109,7 +109,7 @@ export default function NoteDetailPage() {
   }
 
   function handleSaved() {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token || !params.id) return;
 
     getNote(params.id, token).then(setNote).catch(() => {});

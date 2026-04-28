@@ -61,7 +61,7 @@ export default function VersionDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token || !params.id) return;
 
     let cancelled = false;
@@ -91,7 +91,7 @@ export default function VersionDetailPage() {
 
   async function handleDelete() {
     if (!version) return;
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) return;
 
     setDeleting(true);

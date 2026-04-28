@@ -35,7 +35,7 @@ export default async function PaperDetailPage({
 
   let paper;
   try {
-    const token = (session as any).accessToken as string | undefined;
+    const token = session?.accessToken;
     paper = await getPaper(id, token);
   } catch {
     notFound();

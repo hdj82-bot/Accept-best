@@ -26,7 +26,7 @@ export default function NoteEditor({
     const trimmed = content.trim();
     if (!trimmed) return;
 
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) {
       setError("로그인이 필요합니다.");
       return;
