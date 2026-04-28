@@ -18,10 +18,10 @@
 | Render CORS — `Origin: https://academi-ai.vercel.app` preflight | ✅ 200, `access-control-allow-origin: https://academi-ai.vercel.app` (2026-04-28 검증) | stable alias 등록 완료 |
 | Render CORS — deployment-specific URL(`academi-XXXX-...vercel.app`) preflight | ⚠ 400 (의도) | stable alias만 등록하는 정책(§2.3) — deployment-specific URL은 매 배포마다 바뀌므로 미등록이 정상 |
 | Vercel production URL 외부 접근 | ⚠ 401 (Vercel Deployment Protection 활성) | SSO 벽 뒤라 무인증 사용자 접근 불가. 의도된 것이면 OK, 일반 공개 서비스라면 해제 필요 |
-| `NEXTAUTH_SECRET` Vercel ↔ Render byte-exact 일치 | ⚠ 사용자 수동 확인 | 외부에서 검증 불가 |
-| Vercel `NEXT_PUBLIC_API_URL` 실제 등록 여부 | ⚠ 사용자 수동 확인 | 빌드된 클라이언트 번들을 봐야 가능 |
+| `NEXTAUTH_SECRET` Vercel ↔ Render byte-exact 일치 | ✅ 일치 (2026-04-28 사용자 reveal 비교) | 양쪽 Dashboard reveal 후 byte-exact 비교 |
+| Vercel `NEXT_PUBLIC_API_URL` 실제 등록 여부 | ✅ 등록됨, Production 체크 (2026-04-28 검증) | Vercel Settings → Environment Variables 에서 값/Production 체크 확인 + production `/api/auth/session` 200 응답으로 next-auth 클라이언트 정상 동작 간접 검증 |
 
-**요점**: 2026-04-28 기준 production stable alias(`academi.vercel.app`, `academi-ai.vercel.app`) CORS 등록 완료 — 자동 검증으로 확인된 production 차단 이슈는 모두 해소. 남은 사용자 수동 검증 항목 2건(`NEXTAUTH_SECRET` byte-exact, `NEXT_PUBLIC_API_URL` 빌드타임 임베드) + 정책 결정 1건(Vercel Deployment Protection)만 남음.
+**요점**: 2026-04-28 기준 핵심 인증 3종(`NEXTAUTH_SECRET`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`) 모두 검증 완료 — 자동 검증·사용자 수동 검증 모두 ✅. 남은 항목은 정책 결정 1건(Vercel Deployment Protection — 일반 공개 서비스라면 해제, SSO 유지 시 베타 사용자 모집 정책에 영향)뿐.
 
 ---
 
