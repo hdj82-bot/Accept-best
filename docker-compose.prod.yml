@@ -8,14 +8,3 @@ services:
 
   celery_process:
     volumes: []
-
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-      target: prod
-    volumes: []
-    command: npm run start
-
-  nginx:
-    profiles: []
