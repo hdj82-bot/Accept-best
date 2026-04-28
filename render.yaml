@@ -13,8 +13,6 @@ services:
         sync: false
       - key: NEXTAUTH_SECRET
         sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID

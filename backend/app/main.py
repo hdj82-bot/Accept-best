@@ -14,7 +14,6 @@ from app.api.references import router as references_router
 from app.api.research_gaps import router as research_gaps_router
 from app.api.plans import router as plans_router
 from app.api.translation import router as translation_router
-from app.api.expressions import router as expressions_router
 from app.api.users import router as users_router
 from app.core.config import settings
 from app.core.exceptions import AppError, app_error_handler
@@ -55,4 +54,3 @@ app.include_router(notes_router, prefix="/api")
 app.include_router(references_router, prefix="/api")
 app.include_router(research_gaps_router, prefix="/api")
 app.include_router(translation_router, prefix="/api")
-app.include_router(expressions_router, prefix="/api")
