@@ -1,0 +1,11 @@
+# 스크린샷 슬롯
+
+USER_GUIDE.md 에서 참조하는 이미지를 이 디렉토리에 채워주세요:
+
+- login.png — Google 로그인 화면
+- search.png — 논문 검색 결과
+- summary.png — AI 요약 화면
+- survey.png — 설문 문항 자동 생성 화면
+- download.png — 다운로드 메뉴
+
+권장 해상도: 1280×800 이상, PNG 또는 WebP.
