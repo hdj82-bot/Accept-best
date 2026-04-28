@@ -10,6 +10,7 @@ Claude Code가 세션 시작 시 자동으로 읽는 파일입니다.
 - **서비스명**: 논문집필 도우미 (Research Writing Assistant)
 - **타깃**: 한국 대학교 교수·박사과정 연구자
 - **개발 방식**: 1인 Claude Code 개발, 완성도 우선
+- **사용 모델**: Claude Opus 4.7 (`claude-opus-4-7`, 1M context) 고정 — 모든 코드 작성·리뷰·리팩토링은 이 모델로만 진행. 다운그레이드 금지
 - **현재 단계**: Sprint 7 완료 — 베타 배포
 
 ---
@@ -236,6 +237,7 @@ USE_FIXTURES=true        # 개발 중 true, 배포 시 false
 3. **테스트 동시 요청**: 기능 구현 시 pytest도 함께 요청
 4. **막히면 분해**: 한 번에 하나씩. 동작 확인 후 다음 단계
 5. **완료 기준 준수**: 기준 미달이면 다음 태스크 진행 금지
+6. **모델 고정**: 모든 작업은 Opus 4.7(`claude-opus-4-7`, 1M context)로 수행. Sonnet/Haiku로 다운그레이드 금지. 세션 시작 시 `/model claude-opus-4-7`로 확인
 
 ---
 
