@@ -22,8 +22,8 @@ if _url.database and not _url.database.endswith("_test"):
     _url = _url.set(database=f"{_url.database}_test")
 TEST_DATABASE_URL = _url.render_as_string(hide_password=False)
 
-# JWT 테스트 상수
-NEXTAUTH_SECRET = "test-secret-key-for-pytest"
+# JWT 테스트 상수 — backend가 검증에 쓰는 settings.NEXTAUTH_SECRET과 동일 시크릿으로 서명해야 한다
+# (CI는 NEXTAUTH_SECRET=test-secret-for-ci-only 주입, 로컬은 .env 값).
 ALGORITHM = "HS256"
 TEST_USER_ID = "test-user-001"
 TEST_EMAIL = "test@example.com"
@@ -97,9 +97,9 @@ async def seeded_papers(db_session: AsyncSession, paper_fixtures: list[dict]):
 
 @pytest.fixture
 def auth_token() -> str:
-    """테스트용 JWT 토큰을 생성한다."""
+    """테스트용 JWT 토큰을 생성한다. backend가 검증에 쓰는 settings.NEXTAUTH_SECRET 사용."""
     payload = {"sub": TEST_USER_ID, "email": TEST_EMAIL}
-    return jwt.encode(payload, NEXTAUTH_SECRET, algorithm=ALGORITHM)
+    return jwt.encode(payload, settings.NEXTAUTH_SECRET, algorithm=ALGORITHM)
 
 
 @pytest.fixture

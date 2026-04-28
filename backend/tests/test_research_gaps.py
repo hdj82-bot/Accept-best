@@ -24,7 +24,7 @@ def make_token(user_id: str) -> str:
 @pytest.mark.asyncio
 async def test_analyze_requires_auth(client: AsyncClient):
     resp = await client.post(
-        "/research-gaps/analyze",
+        "/api/research-gaps/analyze",
         json={"paper_ids": [str(uuid.uuid4()), str(uuid.uuid4())]},
     )
     assert resp.status_code == 401
@@ -44,7 +44,7 @@ async def test_analyze_paper_not_found(
     missing_id = str(uuid.uuid4())
 
     resp = await client.post(
-        "/research-gaps/analyze",
+        "/api/research-gaps/analyze",
         json={"paper_ids": [existing_id, missing_id]},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -68,7 +68,7 @@ async def test_analyze_success(
          patch("app.api.research_gaps.check_quota", new_callable=AsyncMock) as mock_quota, \
          patch("app.api.research_gaps.increment_usage", new_callable=AsyncMock) as mock_incr:
         resp = await client.post(
-            "/research-gaps/analyze",
+            "/api/research-gaps/analyze",
             json={"paper_ids": paper_ids},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -88,7 +88,7 @@ async def test_analyze_success(
 
 @pytest.mark.asyncio
 async def test_result_requires_auth(client: AsyncClient):
-    resp = await client.get(f"/research-gaps/result/{uuid.uuid4()}")
+    resp = await client.get(f"/api/research-gaps/result/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -102,7 +102,7 @@ async def test_result_pending(client: AsyncClient, auth_headers: dict):
         # celery_app import를 모킹하기 위해 모듈 레벨 패치
         with patch("app.api.research_gaps.celery_app", mock_celery):
             resp = await client.get(
-                f"/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
+                f"/api/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
             )
 
     assert resp.status_code == 200
@@ -119,7 +119,7 @@ async def test_result_failed(client: AsyncClient, auth_headers: dict):
     with patch("app.tasks.celery_app") as mock_celery:
         mock_celery.AsyncResult.return_value = mock_result
         resp = await client.get(
-            f"/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
+            f"/api/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
         )
 
     assert resp.status_code == 200
@@ -138,7 +138,7 @@ async def test_result_celery_unavailable_returns_pending(
         side_effect=Exception("connection refused"),
     ):
         resp = await client.get(
-            f"/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
+            f"/api/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
         )
 
     assert resp.status_code == 200

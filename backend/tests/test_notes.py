@@ -34,7 +34,7 @@ class FakeNote:
 
 @pytest.mark.asyncio
 async def test_create_note_requires_auth(client: AsyncClient):
-    resp = await client.post("/notes", json={"title": "test", "content": "body"})
+    resp = await client.post("/api/notes", json={"title": "test", "content": "body"})
     assert resp.status_code == 401
 
 
@@ -47,7 +47,7 @@ async def test_create_note_success(client: AsyncClient, auth_headers: dict):
         return_value=fake,
     ):
         resp = await client.post(
-            "/notes",
+            "/api/notes",
             json={"title": "연구 메모", "content": "내용"},
             headers=auth_headers,
         )
@@ -65,7 +65,7 @@ async def test_create_note_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_list_notes_requires_auth(client: AsyncClient):
-    resp = await client.get("/notes")
+    resp = await client.get("/api/notes")
     assert resp.status_code == 401
 
 
@@ -76,7 +76,7 @@ async def test_list_notes_empty(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=([], 0),
     ):
-        resp = await client.get("/notes", headers=auth_headers)
+        resp = await client.get("/api/notes", headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -91,7 +91,7 @@ async def test_list_notes_empty(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_get_note_requires_auth(client: AsyncClient):
-    resp = await client.get(f"/notes/{uuid.uuid4()}")
+    resp = await client.get(f"/api/notes/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -102,7 +102,7 @@ async def test_get_note_not_found(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.get(f"/notes/{uuid.uuid4()}", headers=auth_headers)
+        resp = await client.get(f"/api/notes/{uuid.uuid4()}", headers=auth_headers)
 
     assert resp.status_code == 404
     assert "Note not found" in resp.json()["detail"]
@@ -116,7 +116,7 @@ async def test_get_note_success(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=fake,
     ):
-        resp = await client.get(f"/notes/{fake.id}", headers=auth_headers)
+        resp = await client.get(f"/api/notes/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 200
     assert resp.json()["id"] == fake.id
@@ -129,7 +129,7 @@ async def test_get_note_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_update_note_requires_auth(client: AsyncClient):
-    resp = await client.put(f"/notes/{uuid.uuid4()}", json={"title": "new"})
+    resp = await client.put(f"/api/notes/{uuid.uuid4()}", json={"title": "new"})
     assert resp.status_code == 401
 
 
@@ -141,7 +141,7 @@ async def test_update_note_not_found(client: AsyncClient, auth_headers: dict):
         return_value=None,
     ):
         resp = await client.put(
-            f"/notes/{uuid.uuid4()}",
+            f"/api/notes/{uuid.uuid4()}",
             json={"title": "updated"},
             headers=auth_headers,
         )
@@ -159,7 +159,7 @@ async def test_update_note_success(client: AsyncClient, auth_headers: dict):
         return_value=fake,
     ):
         resp = await client.put(
-            f"/notes/{fake.id}",
+            f"/api/notes/{fake.id}",
             json={"title": "수정된 제목"},
             headers=auth_headers,
         )
@@ -175,7 +175,7 @@ async def test_update_note_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_delete_note_requires_auth(client: AsyncClient):
-    resp = await client.delete(f"/notes/{uuid.uuid4()}")
+    resp = await client.delete(f"/api/notes/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -186,7 +186,7 @@ async def test_delete_note_not_found(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.delete(f"/notes/{uuid.uuid4()}", headers=auth_headers)
+        resp = await client.delete(f"/api/notes/{uuid.uuid4()}", headers=auth_headers)
 
     assert resp.status_code == 404
 
@@ -202,7 +202,7 @@ async def test_delete_note_success(client: AsyncClient, auth_headers: dict):
         "app.api.research_notes.delete_note",
         new_callable=AsyncMock,
     ) as mock_del:
-        resp = await client.delete(f"/notes/{fake.id}", headers=auth_headers)
+        resp = await client.delete(f"/api/notes/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 200
     assert resp.json()["message"] == "삭제되었습니다"
@@ -216,7 +216,7 @@ async def test_delete_note_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_to_draft_requires_auth(client: AsyncClient):
-    resp = await client.post("/notes/to-draft", json={"note_id": str(uuid.uuid4())})
+    resp = await client.post("/api/notes/to-draft", json={"note_id": str(uuid.uuid4())})
     assert resp.status_code == 401
 
 
@@ -228,7 +228,7 @@ async def test_to_draft_note_not_found(client: AsyncClient, auth_headers: dict):
         return_value=None,
     ):
         resp = await client.post(
-            "/notes/to-draft",
+            "/api/notes/to-draft",
             json={"note_id": str(uuid.uuid4())},
             headers=auth_headers,
         )
@@ -254,7 +254,7 @@ async def test_to_draft_success(
          patch("app.api.research_notes.check_quota", new_callable=AsyncMock) as mock_quota, \
          patch("app.api.research_notes.increment_usage", new_callable=AsyncMock) as mock_incr:
         resp = await client.post(
-            "/notes/to-draft",
+            "/api/notes/to-draft",
             json={"note_id": fake.id},
             headers={"Authorization": f"Bearer {token}"},
         )

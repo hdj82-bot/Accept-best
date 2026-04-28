@@ -23,7 +23,7 @@ def make_token(user_id: str) -> str:
 
 @pytest.mark.asyncio
 async def test_list_plans_returns_three(client: AsyncClient):
-    resp = await client.get("/plans")
+    resp = await client.get("/api/plans")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 3
@@ -33,7 +33,7 @@ async def test_list_plans_returns_three(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_list_plans_free_limits(client: AsyncClient):
-    resp = await client.get("/plans")
+    resp = await client.get("/api/plans")
     free = resp.json()[0]
     assert free["price_krw"] == 0
     assert free["limits"]["research_count"] == 5
@@ -42,7 +42,7 @@ async def test_list_plans_free_limits(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_list_plans_pro_unlimited(client: AsyncClient):
-    resp = await client.get("/plans")
+    resp = await client.get("/api/plans")
     pro = resp.json()[2]
     assert pro["limits"]["research_count"] == -1
 
@@ -53,7 +53,7 @@ async def test_list_plans_pro_unlimited(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_usage_requires_auth(client: AsyncClient):
-    resp = await client.get("/plans/usage")
+    resp = await client.get("/api/plans/usage")
     assert resp.status_code == 401
 
 
@@ -68,7 +68,7 @@ async def test_usage_returns_zero_for_new_user(
 
     token = make_token(user_id)
     resp = await client.get(
-        "/plans/usage", headers={"Authorization": f"Bearer {token}"}
+        "/api/plans/usage", headers={"Authorization": f"Bearer {token}"}
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -89,7 +89,7 @@ async def test_usage_reflects_user_plan(
 
     token = make_token(user_id)
     resp = await client.get(
-        "/plans/usage", headers={"Authorization": f"Bearer {token}"}
+        "/api/plans/usage", headers={"Authorization": f"Bearer {token}"}
     )
     data = resp.json()
     assert data["plan"] == "basic"

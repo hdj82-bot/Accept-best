@@ -31,7 +31,7 @@ class FakeVersion:
 
 @pytest.mark.asyncio
 async def test_create_version_requires_auth(client: AsyncClient):
-    resp = await client.post("/versions", json={"paper_id": "any", "label": "v1"})
+    resp = await client.post("/api/versions", json={"paper_id": "any", "label": "v1"})
     assert resp.status_code == 401
 
 
@@ -44,7 +44,7 @@ async def test_create_version_success(client: AsyncClient, auth_headers: dict):
         return_value=fake,
     ):
         resp = await client.post(
-            "/versions",
+            "/api/versions",
             json={"paper_id": fake.paper_id, "label": "v1.0", "content": "본문"},
             headers=auth_headers,
         )
@@ -62,7 +62,7 @@ async def test_create_version_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_list_versions_requires_auth(client: AsyncClient):
-    resp = await client.get("/versions")
+    resp = await client.get("/api/versions")
     assert resp.status_code == 401
 
 
@@ -73,7 +73,7 @@ async def test_list_versions_empty(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=([], 0),
     ):
-        resp = await client.get("/versions", headers=auth_headers)
+        resp = await client.get("/api/versions", headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -88,7 +88,7 @@ async def test_list_versions_empty(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_get_version_requires_auth(client: AsyncClient):
-    resp = await client.get(f"/versions/{uuid.uuid4()}")
+    resp = await client.get(f"/api/versions/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -99,7 +99,7 @@ async def test_get_version_not_found(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.get(f"/versions/{uuid.uuid4()}", headers=auth_headers)
+        resp = await client.get(f"/api/versions/{uuid.uuid4()}", headers=auth_headers)
 
     assert resp.status_code == 404
     assert "Version not found" in resp.json()["detail"]
@@ -113,7 +113,7 @@ async def test_get_version_success(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=fake,
     ):
-        resp = await client.get(f"/versions/{fake.id}", headers=auth_headers)
+        resp = await client.get(f"/api/versions/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 200
     assert resp.json()["id"] == fake.id
@@ -126,7 +126,7 @@ async def test_get_version_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_delete_version_requires_auth(client: AsyncClient):
-    resp = await client.delete(f"/versions/{uuid.uuid4()}")
+    resp = await client.delete(f"/api/versions/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -137,7 +137,7 @@ async def test_delete_version_not_found(client: AsyncClient, auth_headers: dict)
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.delete(f"/versions/{uuid.uuid4()}", headers=auth_headers)
+        resp = await client.delete(f"/api/versions/{uuid.uuid4()}", headers=auth_headers)
 
     assert resp.status_code == 404
 
@@ -151,7 +151,7 @@ async def test_delete_auto_version_rejected(client: AsyncClient, auth_headers: d
         new_callable=AsyncMock,
         return_value=fake,
     ):
-        resp = await client.delete(f"/versions/{fake.id}", headers=auth_headers)
+        resp = await client.delete(f"/api/versions/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 400
     assert "자동 저장" in resp.json()["detail"]
@@ -169,7 +169,7 @@ async def test_delete_manual_version_success(client: AsyncClient, auth_headers: 
         "app.api.paper_versions.delete_version",
         new_callable=AsyncMock,
     ) as mock_del:
-        resp = await client.delete(f"/versions/{fake.id}", headers=auth_headers)
+        resp = await client.delete(f"/api/versions/{fake.id}", headers=auth_headers)
 
     assert resp.status_code == 200
     assert resp.json()["message"] == "삭제되었습니다"

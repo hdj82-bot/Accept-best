@@ -23,7 +23,7 @@ def make_token(user_id: str) -> str:
 
 @pytest.mark.asyncio
 async def test_run_diagnosis_requires_auth(client: AsyncClient):
-    resp = await client.post("/diagnosis/run", json={"paper_id": "any"})
+    resp = await client.post("/api/diagnosis/run", json={"paper_id": "any"})
     assert resp.status_code == 401
 
 
@@ -38,7 +38,7 @@ async def test_run_diagnosis_paper_not_found(
 
     token = make_token(user_id)
     resp = await client.post(
-        "/diagnosis/run",
+        "/api/diagnosis/run",
         json={"paper_id": str(uuid.uuid4())},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -62,7 +62,7 @@ async def test_run_diagnosis_success(
          patch("app.api.diagnosis.check_quota", new_callable=AsyncMock) as mock_quota, \
          patch("app.api.diagnosis.increment_usage", new_callable=AsyncMock) as mock_incr:
         resp = await client.post(
-            "/diagnosis/run",
+            "/api/diagnosis/run",
             json={"paper_id": paper_id},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -82,7 +82,7 @@ async def test_run_diagnosis_success(
 
 @pytest.mark.asyncio
 async def test_list_diagnoses_requires_auth(client: AsyncClient):
-    resp = await client.get("/diagnosis")
+    resp = await client.get("/api/diagnosis")
     assert resp.status_code == 401
 
 
@@ -93,7 +93,7 @@ async def test_list_diagnoses_empty(client: AsyncClient, auth_headers: dict):
         new_callable=AsyncMock,
         return_value=([], 0),
     ):
-        resp = await client.get("/diagnosis", headers=auth_headers)
+        resp = await client.get("/api/diagnosis", headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -110,7 +110,7 @@ async def test_list_diagnoses_with_paper_id(client: AsyncClient, auth_headers: d
         return_value=([], 0),
     ) as mock_list:
         resp = await client.get(
-            f"/diagnosis?paper_id={fake_paper_id}", headers=auth_headers,
+            f"/api/diagnosis?paper_id={fake_paper_id}", headers=auth_headers,
         )
 
     assert resp.status_code == 200
@@ -126,7 +126,7 @@ async def test_list_diagnoses_with_paper_id(client: AsyncClient, auth_headers: d
 
 @pytest.mark.asyncio
 async def test_get_diagnosis_requires_auth(client: AsyncClient):
-    resp = await client.get(f"/diagnosis/{uuid.uuid4()}")
+    resp = await client.get(f"/api/diagnosis/{uuid.uuid4()}")
     assert resp.status_code == 401
 
 
@@ -138,7 +138,7 @@ async def test_get_diagnosis_not_found(client: AsyncClient, auth_headers: dict):
         return_value=None,
     ):
         resp = await client.get(
-            f"/diagnosis/{uuid.uuid4()}", headers=auth_headers,
+            f"/api/diagnosis/{uuid.uuid4()}", headers=auth_headers,
         )
 
     assert resp.status_code == 404
@@ -164,7 +164,7 @@ async def test_get_diagnosis_success(client: AsyncClient, auth_headers: dict):
         return_value=FakeDiagnosis(),
     ):
         resp = await client.get(
-            f"/diagnosis/{diagnosis_id}", headers=auth_headers,
+            f"/api/diagnosis/{diagnosis_id}", headers=auth_headers,
         )
 
     assert resp.status_code == 200
@@ -180,27 +180,27 @@ async def test_get_diagnosis_success(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_share_paper_not_found(client: AsyncClient):
-    resp = await client.get(f"/share/paper/{uuid.uuid4()}")
+    resp = await client.get(f"/api/share/paper/{uuid.uuid4()}")
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_share_paper_success(client: AsyncClient, seeded_papers):
     paper = seeded_papers[0]
-    resp = await client.get(f"/share/paper/{paper.id}")
+    resp = await client.get(f"/api/share/paper/{paper.id}")
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["title"] == paper.title
     assert len(data["abstract_summary"]) <= 200
-    assert data["share_url"] == f"/share/paper/{paper.id}"
+    assert data["share_url"] == f"/api/share/paper/{paper.id}"
 
 
 @pytest.mark.asyncio
 async def test_share_paper_no_auth_required(client: AsyncClient, seeded_papers):
     """인증 헤더 없이도 접근 가능해야 한다."""
     paper = seeded_papers[0]
-    resp = await client.get(f"/share/paper/{paper.id}")
+    resp = await client.get(f"/api/share/paper/{paper.id}")
     assert resp.status_code == 200
 
 
@@ -216,7 +216,7 @@ async def test_share_diagnosis_not_found(client: AsyncClient):
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.get(f"/share/diagnosis/{uuid.uuid4()}")
+        resp = await client.get(f"/api/share/diagnosis/{uuid.uuid4()}")
     assert resp.status_code == 404
 
 
@@ -238,14 +238,14 @@ async def test_share_diagnosis_success(client: AsyncClient, seeded_papers):
         new_callable=AsyncMock,
         return_value=FakeDiagnosis(),
     ):
-        resp = await client.get(f"/share/diagnosis/{diagnosis_id}")
+        resp = await client.get(f"/api/share/diagnosis/{diagnosis_id}")
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["paper_title"] == paper.title
     assert data["overall_score"] == 85
     assert data["section_scores"]["introduction"] == 90
-    assert data["share_url"] == f"/share/diagnosis/{diagnosis_id}"
+    assert data["share_url"] == f"/api/share/diagnosis/{diagnosis_id}"
 
 
 @pytest.mark.asyncio
@@ -256,6 +256,6 @@ async def test_share_diagnosis_no_auth_required(client: AsyncClient):
         new_callable=AsyncMock,
         return_value=None,
     ):
-        resp = await client.get(f"/share/diagnosis/{uuid.uuid4()}")
+        resp = await client.get(f"/api/share/diagnosis/{uuid.uuid4()}")
     # 404는 OK — 중요한 건 401이 아니라는 것
     assert resp.status_code != 401
