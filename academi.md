@@ -1,17 +1,24 @@
-# 논문집필 도우미 — Claude Code 컨텍스트
+# academi.md — 프로젝트 컨텍스트 (개발자/Claude용)
 
 ## 이 파일의 역할
-Claude Code가 세션 시작 시 자동으로 읽는 파일입니다.
+
+**대상**: 코드를 작성/수정하는 개발자와 Claude Code 세션.
+**범위**: 프로젝트 전체의 **아키텍처 결정사항, DB 스키마, 핵심 코드 패턴**의 단일 출처(SoT).
+
+> 운영자/외부 방문자용 개요는 [README.md](README.md), Claude 세션 운영 룰은 [CLAUDE.md](CLAUDE.md), 비-Claude 에이전트용 룰은 [AGENTS.md](AGENTS.md)를 참고하세요.
+
 새 태스크 착수 전 반드시 이 파일을 먼저 확인하고 기존 구조에 맞게 코드를 작성하세요.
 
 ---
 
 ## 프로젝트 개요
+
 - **서비스명**: 논문집필 도우미 (Research Writing Assistant)
 - **타깃**: 한국 대학교 교수·박사과정 연구자
 - **개발 방식**: 1인 Claude Code 개발, 완성도 우선
-- **사용 모델**: Claude Opus 4.7 (`claude-opus-4-7`, 1M context) 고정 — 모든 코드 작성·리뷰·리팩토링은 이 모델로만 진행. 다운그레이드 금지
-- **현재 단계**: Sprint 7 완료 — 베타 배포
+- **현재 단계**: Sprint 7 완료 — 베타 배포 (2026-04 기준)
+
+> 사용 모델 정책은 [CLAUDE.md](CLAUDE.md)에서 관리합니다. 이 파일에서는 다루지 않습니다.
 
 ---
 
@@ -43,30 +50,33 @@ Claude Code가 세션 시작 시 자동으로 읽는 파일입니다.
 
 ```
 project-root/
-├── CLAUDE.md              ← 이 파일
+├── README.md             ← 운영자/외부 방문자용
+├── academi.md            ← 이 파일 (개발자/Claude용)
+├── CLAUDE.md             ← Claude Code 세션 룰
+├── AGENTS.md             ← 비-Claude 에이전트 룰
 ├── docker-compose.yml
-├── .env.example
-├── backend/               ← FastAPI
+├── .env.example          ← 환경변수 정본
+├── docs/                 ← 베타 사용자 가이드, FAQ
+├── .github/
+│   └── CHECKLIST_ENV_VARS.md  ← production 환경변수 점검
+├── backend/              ← FastAPI
 │   ├── app/
 │   │   ├── main.py
-│   │   ├── api/           ← 라우터
-│   │   ├── models/        ← SQLAlchemy 모델
-│   │   ├── schemas/       ← Pydantic 스키마
-│   │   ├── services/      ← 비즈니스 로직
-│   │   ├── tasks/         ← Celery 태스크
+│   │   ├── api/          ← 라우터
+│   │   ├── models/       ← SQLAlchemy 모델
+│   │   ├── schemas/      ← Pydantic 스키마
+│   │   ├── services/     ← 비즈니스 로직
+│   │   ├── tasks/        ← Celery 태스크
 │   │   └── core/
-│   │       ├── auth.py    ← JWT 검증 미들웨어
+│   │       ├── auth.py   ← JWT 검증 미들웨어
 │   │       ├── exceptions.py ← 에러 표준화
-│   │       └── config.py  ← 환경변수
+│   │       └── config.py ← 환경변수
 │   ├── tests/
 │   │   └── fixtures/
 │   │       └── papers.json ← 시드 데이터 10편
-│   ├── alembic/           ← DB 마이그레이션
+│   ├── alembic/          ← DB 마이그레이션
 │   └── requirements.txt
-└── frontend/              ← Next.js
-    ├── app/               ← App Router
-    ├── components/
-    └── package.json
+└── (frontend는 레포 루트의 app/, components/, lib/, package.json)
 ```
 
 ---
@@ -183,36 +193,9 @@ async def increment_usage(user_id: str, field: str, db: AsyncSession):
 
 ---
 
-## 환경변수 목록 (.env.example)
+## 환경변수
 
-```
-# 인증 (next-auth와 FastAPI 동일 값 필수)
-NEXTAUTH_SECRET=
-
-# Google OAuth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-
-# AI API
-GEMINI_API_KEY=          # 텍스트 생성 + 임베딩(1536차원) 통합
-
-# 번역 (Phase 2에서 활성화)
-DEEPL_API_KEY=
-
-# 논문 수집
-SS_API_KEY=              # Semantic Scholar, 일 1,000건 무료
-
-# 인프라
-DATABASE_URL=            # postgresql://...
-REDIS_URL=               # redis://...
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_S3_BUCKET=
-SENTRY_DSN=
-
-# 개발 편의
-USE_FIXTURES=true        # 개발 중 true, 배포 시 false
-```
+정본은 [`.env.example`](.env.example)입니다. 운영자 시점의 위치별 등록 가이드는 [README.md의 환경변수 표](README.md#환경변수-표), production 점검 절차는 [`.github/CHECKLIST_ENV_VARS.md`](.github/CHECKLIST_ENV_VARS.md)를 참고하세요.
 
 ---
 
@@ -226,31 +209,3 @@ USE_FIXTURES=true        # 개발 중 true, 배포 시 false
 - [x] Sprint 5: 논문 버전 관리 + AI 연구 노트
 - [x] Sprint 6: 참고문헌 + 연구 공백 발견
 - [x] Sprint 7: 베타 배포 ← **완료**
-
----
-
-## Claude Code 작업 원칙
-
-1. **컨텍스트 선주입**: 새 태스크 착수 전 관련 기존 코드를 먼저 보여주고 요청
-2. **계획 먼저**: 복잡한 태스크는 "코드 쓰지 말고 계획만 먼저 말해줘"
-3. **테스트 동시 요청**: 기능 구현 시 pytest도 함께 요청
-4. **막히면 분해**: 한 번에 하나씩. 동작 확인 후 다음 단계
-5. **완료 기준 준수**: 기준 미달이면 다음 태스크 진행 금지
-6. **모델 고정**: 모든 작업은 Opus 4.7(`claude-opus-4-7`, 1M context)로 수행. Sonnet/Haiku로 다운그레이드 금지. 세션 시작 시 `/model claude-opus-4-7`로 확인
-
----
-
-## 현재 Sprint 0 체크리스트
-
-- [ ] GitHub 레포 생성. main·develop 브랜치. .env.example 작성
-- [ ] docker-compose up 성공. pgvector 익스텐션 활성화 확인
-- [ ] 6개 테이블 생성. papers.embedding vector(1536) 확인
-- [ ] celery_collect 워커 실행 + Flower에서 큐 확인
-- [ ] celery_process 워커 실행 + Flower에서 큐 확인
-- [ ] GET /health → {"status":"ok"} 반환
-- [ ] AppError → {"error":"...", "message":"..."} JSON 반환
-- [ ] pytest 실행 시 fixtures 10편 자동 시딩
-- [ ] Next.js localhost:3000 렌더링
-- [ ] Sentry 에러 수신 확인
-- [ ] FastAPI /docs Swagger UI 확인
-- [ ] .env가 .gitignore에 포함됨 확인
