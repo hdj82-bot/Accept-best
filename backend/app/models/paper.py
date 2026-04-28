@@ -24,6 +24,7 @@ class Paper(Base):
     source_id: Mapped[str] = mapped_column(String(100), nullable=False)
     author_ids: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     keywords: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    pdf_url: Mapped[str | None] = mapped_column(Text)
     embedding = mapped_column(Vector(1536))  # Gemini gemini-embedding-001 (1536-dim), 차원 변경 금지
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
