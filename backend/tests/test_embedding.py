@@ -1,3 +1,4 @@
+"""embedding_service 단위 테스트 — Gemini embed_content 호출 모킹."""
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,54 +12,64 @@ from app.services.embedding_service import (
 )
 
 
+def _mock_embed_response(vector: list[float]) -> MagicMock:
+    """Gemini embed_content 응답: result.embeddings[0].values."""
+    response = MagicMock()
+    embedding = MagicMock()
+    embedding.values = vector
+    response.embeddings = [embedding]
+    return response
+
+
+def _patched_client(return_value=None, side_effect=None) -> MagicMock:
+    client = MagicMock()
+    client.aio.models.embed_content = AsyncMock(
+        return_value=return_value, side_effect=side_effect
+    )
+    return client
+
+
 # ──────────────────────────────────────────────
 # create_embedding
 # ──────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_create_embedding_returns_correct_dim():
-    """OpenAI API → 1536차원 벡터."""
-    fake_vector = [0.1] * 1536
-    mock_response = MagicMock()
-    mock_response.data = [MagicMock(embedding=fake_vector)]
+    fake_vector = [0.1] * EMBEDDING_DIM
+    client = _patched_client(return_value=_mock_embed_response(fake_vector))
 
-    mock_client = AsyncMock()
-    mock_client.embeddings.create.return_value = mock_response
-
-    with patch("app.services.embedding_service._get_client", return_value=mock_client):
+    with patch("app.services.embedding_service.get_gemini_client", return_value=client):
         result = await create_embedding("test text")
 
-    assert len(result) == 1536
-    mock_client.embeddings.create.assert_called_once_with(
-        model=EMBEDDING_MODEL,
-        input="test text",
-        dimensions=EMBEDDING_DIM,
-    )
+    assert len(result) == EMBEDDING_DIM
+    call_kwargs = client.aio.models.embed_content.call_args.kwargs
+    assert call_kwargs["model"] == EMBEDDING_MODEL
+    assert call_kwargs["contents"] == "test text"
+    assert call_kwargs["config"].output_dimensionality == EMBEDDING_DIM
 
 
 @pytest.mark.asyncio
 async def test_create_embedding_api_error():
-    """OpenAI 오류 → ExternalAPIError 변환."""
-    mock_client = AsyncMock()
-    mock_client.embeddings.create.side_effect = Exception("rate limit")
+    client = _patched_client(side_effect=Exception("rate limit"))
 
     with (
-        patch("app.services.embedding_service._get_client", return_value=mock_client),
+        patch("app.services.embedding_service.get_gemini_client", return_value=client),
         pytest.raises(ExternalAPIError) as exc_info,
     ):
         await create_embedding("test")
 
-    assert "OpenAI" in exc_info.value.message
+    assert "Gemini" in exc_info.value.message
 
 
 # ──────────────────────────────────────────────
 # embed_and_save
 # ──────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_embed_and_save_calls_db():
-    """임베딩 생성 + DB update 호출 확인."""
-    fake_vector = [0.02] * 1536
+    fake_vector = [0.02] * EMBEDDING_DIM
 
     with patch(
         "app.services.embedding_service.create_embedding",
@@ -68,7 +79,7 @@ async def test_embed_and_save_calls_db():
         mock_db = AsyncMock()
         result = await embed_and_save("paper-123", "some text", mock_db)
 
-    assert len(result) == 1536
+    assert len(result) == EMBEDDING_DIM
     mock_db.execute.assert_called_once()
     mock_db.commit.assert_called_once()
 
@@ -77,8 +88,9 @@ async def test_embed_and_save_calls_db():
 # 상수 검증
 # ──────────────────────────────────────────────
 
+
 def test_embedding_model_name():
-    assert EMBEDDING_MODEL == "text-embedding-3-small"
+    assert EMBEDDING_MODEL == "gemini-embedding-001"
 
 
 def test_embedding_dimension():

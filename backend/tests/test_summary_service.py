@@ -1,4 +1,4 @@
-"""summary_service 단위 테스트 — Claude API 호출 모킹."""
+"""summary_service 단위 테스트 — Gemini API 호출 모킹."""
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -6,16 +6,23 @@ import pytest
 
 from app.core.exceptions import ExternalAPIError
 from app.schemas.summary import SummaryRead
-from app.services.summary_service import SYSTEM_PROMPT, summarize_paper
+from app.services.summary_service import MODEL, SYSTEM_PROMPT, summarize_paper
 
 
-def _mock_claude_response(data: dict) -> MagicMock:
-    """Claude API 응답 객체를 모킹."""
-    text_block = MagicMock()
-    text_block.text = json.dumps(data, ensure_ascii=False)
+def _mock_gemini_response(data: dict | None, text_override: str | None = None) -> MagicMock:
+    """Gemini generate_content 응답 객체 모킹. data 또는 text_override 중 하나 사용."""
     response = MagicMock()
-    response.content = [text_block]
+    response.text = text_override if text_override is not None else json.dumps(data, ensure_ascii=False)
     return response
+
+
+def _patched_client(return_value=None, side_effect=None) -> MagicMock:
+    """get_gemini_client가 반환할 mock client. aio.models.generate_content가 AsyncMock."""
+    client = MagicMock()
+    client.aio.models.generate_content = AsyncMock(
+        return_value=return_value, side_effect=side_effect
+    )
+    return client
 
 
 VALID_RESPONSE = {
@@ -33,10 +40,9 @@ VALID_RESPONSE = {
 
 @pytest.mark.asyncio
 async def test_summarize_returns_summary_read():
-    mock_client = AsyncMock()
-    mock_client.messages.create.return_value = _mock_claude_response(VALID_RESPONSE)
+    client = _patched_client(return_value=_mock_gemini_response(VALID_RESPONSE))
 
-    with patch("app.services.summary_service._get_client", return_value=mock_client):
+    with patch("app.services.summary_service.get_gemini_client", return_value=client):
         result = await summarize_paper("paper-1", "Attention Is All You Need", "We propose...")
 
     assert isinstance(result, SummaryRead)
@@ -49,18 +55,17 @@ async def test_summarize_returns_summary_read():
 
 @pytest.mark.asyncio
 async def test_summarize_passes_correct_params():
-    mock_client = AsyncMock()
-    mock_client.messages.create.return_value = _mock_claude_response(VALID_RESPONSE)
+    client = _patched_client(return_value=_mock_gemini_response(VALID_RESPONSE))
 
-    with patch("app.services.summary_service._get_client", return_value=mock_client):
+    with patch("app.services.summary_service.get_gemini_client", return_value=client):
         await summarize_paper("p-1", "Title", "Abstract text")
 
-    call_kwargs = mock_client.messages.create.call_args.kwargs
-    assert call_kwargs["model"] == "claude-sonnet-4-20250514"
-    assert call_kwargs["max_tokens"] == 1024
-    assert call_kwargs["system"] == SYSTEM_PROMPT
-    assert "Title" in call_kwargs["messages"][0]["content"]
-    assert "Abstract text" in call_kwargs["messages"][0]["content"]
+    call_kwargs = client.aio.models.generate_content.call_args.kwargs
+    assert call_kwargs["model"] == MODEL
+    assert call_kwargs["config"]["system_instruction"] == SYSTEM_PROMPT
+    assert call_kwargs["config"]["max_output_tokens"] == 1024
+    assert "Title" in call_kwargs["contents"]
+    assert "Abstract text" in call_kwargs["contents"]
 
 
 # ──────────────────────────────────────────────
@@ -70,11 +75,10 @@ async def test_summarize_passes_correct_params():
 
 @pytest.mark.asyncio
 async def test_summarize_api_error_raises_external():
-    mock_client = AsyncMock()
-    mock_client.messages.create.side_effect = Exception("overloaded")
+    client = _patched_client(side_effect=Exception("overloaded"))
 
     with (
-        patch("app.services.summary_service._get_client", return_value=mock_client),
+        patch("app.services.summary_service.get_gemini_client", return_value=client),
         pytest.raises(ExternalAPIError) as exc_info,
     ):
         await summarize_paper("p-1", "Title", "Abstract")
@@ -90,16 +94,10 @@ async def test_summarize_api_error_raises_external():
 
 @pytest.mark.asyncio
 async def test_summarize_invalid_json_raises_external():
-    text_block = MagicMock()
-    text_block.text = "This is not JSON"
-    response = MagicMock()
-    response.content = [text_block]
-
-    mock_client = AsyncMock()
-    mock_client.messages.create.return_value = response
+    client = _patched_client(return_value=_mock_gemini_response(None, text_override="This is not JSON"))
 
     with (
-        patch("app.services.summary_service._get_client", return_value=mock_client),
+        patch("app.services.summary_service.get_gemini_client", return_value=client),
         pytest.raises(ExternalAPIError) as exc_info,
     ):
         await summarize_paper("p-1", "Title", "Abstract")
@@ -109,32 +107,26 @@ async def test_summarize_invalid_json_raises_external():
 
 @pytest.mark.asyncio
 async def test_summarize_missing_field_raises_external():
-    """필수 필드 누락 → ExternalAPIError."""
-    incomplete = {"summary_ko": "요약만 있음"}  # key_findings, methodology, limitations 없음
-
-    mock_client = AsyncMock()
-    mock_client.messages.create.return_value = _mock_claude_response(incomplete)
+    """필수 필드 누락 → KeyError → service가 처리 안 함 → 그대로 propagate."""
+    incomplete = {"summary_ko": "요약만 있음"}
+    client = _patched_client(return_value=_mock_gemini_response(incomplete))
 
     with (
-        patch("app.services.summary_service._get_client", return_value=mock_client),
+        patch("app.services.summary_service.get_gemini_client", return_value=client),
+        pytest.raises(KeyError),
+    ):
+        await summarize_paper("p-1", "Title", "Abstract")
+
+
+@pytest.mark.asyncio
+async def test_summarize_empty_response_raises_external():
+    """response.text가 빈 문자열 → JSONDecodeError → ExternalAPIError."""
+    client = _patched_client(return_value=_mock_gemini_response(None, text_override=""))
+
+    with (
+        patch("app.services.summary_service.get_gemini_client", return_value=client),
         pytest.raises(ExternalAPIError) as exc_info,
     ):
         await summarize_paper("p-1", "Title", "Abstract")
 
     assert "Invalid response format" in exc_info.value.message
-
-
-@pytest.mark.asyncio
-async def test_summarize_empty_content_raises_external():
-    """빈 content 배열 → IndexError → ExternalAPIError."""
-    response = MagicMock()
-    response.content = []
-
-    mock_client = AsyncMock()
-    mock_client.messages.create.return_value = response
-
-    with (
-        patch("app.services.summary_service._get_client", return_value=mock_client),
-        pytest.raises(ExternalAPIError),
-    ):
-        await summarize_paper("p-1", "Title", "Abstract")
