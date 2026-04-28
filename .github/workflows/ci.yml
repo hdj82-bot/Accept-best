@@ -42,7 +42,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
-      - run: pytest -v
+      - run: pytest -v --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=60
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/academi_test
           REDIS_URL: redis://localhost:6379/0

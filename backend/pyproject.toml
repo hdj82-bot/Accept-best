@@ -1,0 +1,13 @@
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = [
+    "app/main.py",
+    "app/__init__.py",
+    "alembic/*",
+    "tests/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
