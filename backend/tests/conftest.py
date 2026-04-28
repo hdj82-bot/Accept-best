@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -68,10 +69,16 @@ async def client(db_session: AsyncSession):
 
 @pytest.fixture
 def paper_fixtures() -> list[dict]:
-    """fixtures/papers.json에서 시드 데이터 10편 로드."""
+    """fixtures/papers.json에서 시드 데이터 10편 로드. ISO 문자열 → datetime 변환."""
     fixture_path = Path(__file__).parent / "fixtures" / "papers.json"
     with open(fixture_path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    # asyncpg는 DateTime(timezone=True) 컬럼에 datetime 인스턴스를 요구.
+    for paper in data:
+        published = paper.get("published_at")
+        if isinstance(published, str):
+            paper["published_at"] = datetime.fromisoformat(published.replace("Z", "+00:00"))
+    return data
 
 
 @pytest_asyncio.fixture(loop_scope="session")
