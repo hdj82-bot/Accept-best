@@ -57,7 +57,7 @@ async def _summarize(paper_id: str) -> dict:
     max_retries=3,
 )
 def generate_embedding(paper_id: str) -> dict:
-    """text-embedding-3-small 임베딩 생성 후 DB 저장."""
+    """Gemini gemini-embedding-001 (1536-dim) 임베딩 생성 후 DB 저장."""
     return _run_async(_embed(paper_id))
 
 
