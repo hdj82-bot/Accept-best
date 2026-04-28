@@ -29,7 +29,7 @@ export default function ReferenceDetailPage() {
   const [copied, setCopied] = useState(false);
 
   function fetchReference() {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token || !params.id) return;
 
     setLoading(true);
@@ -53,7 +53,7 @@ export default function ReferenceDetailPage() {
 
   async function handleDelete() {
     if (!reference) return;
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) return;
 
     setDeleting(true);

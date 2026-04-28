@@ -15,7 +15,7 @@ export default function VersionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleManualSave() {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) {
       setError("로그인이 필요합니다.");
       return;

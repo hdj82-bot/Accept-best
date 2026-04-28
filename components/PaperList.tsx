@@ -35,7 +35,7 @@ export default function PaperList() {
       setLoading(true);
       setError(null);
       try {
-        const token = (session as any)?.accessToken as string | undefined;
+        const token = session?.accessToken;
         const result: PaperSearchResult = await searchPapers(query, page, perPage, token);
         if (!cancelled) {
           setPapers(result.papers);

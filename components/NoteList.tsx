@@ -37,7 +37,7 @@ export default function NoteList({
   const totalPages = Math.max(1, Math.ceil(total / perPage));
 
   useEffect(() => {
-    const token = (session as any)?.accessToken as string | undefined;
+    const token = session?.accessToken;
     if (!token) return;
 
     let cancelled = false;
