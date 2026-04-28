@@ -20,7 +20,11 @@ from app.core.exceptions import AppError, app_error_handler
 
 # Sentry 초기화
 if settings.SENTRY_DSN:
-    sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=0.1)
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.SENTRY_ENVIRONMENT or None,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+    )
 
 app = FastAPI(
     title="논문집필 도우미 API",

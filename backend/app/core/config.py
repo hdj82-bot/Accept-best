@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://academi:academi@db:5432/academi"
     REDIS_URL: str = "redis://redis:6379/0"
     SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
     # AWS
     AWS_ACCESS_KEY_ID: str = ""
