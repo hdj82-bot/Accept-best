@@ -79,7 +79,7 @@ async def test_summarize_api_error_raises_external():
     ):
         await summarize_paper("p-1", "Title", "Abstract")
 
-    assert "Anthropic" in exc_info.value.message
+    assert "Gemini" in exc_info.value.message
     assert "overloaded" in exc_info.value.message
 
 

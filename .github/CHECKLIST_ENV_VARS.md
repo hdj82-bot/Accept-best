@@ -35,7 +35,7 @@
 | `DATABASE_URL` | — | ✓ | `backend/app/core/config.py:22` |
 | `REDIS_URL` | — | ✓ | `backend/app/core/config.py:23` |
 | `SENTRY_DSN` | (선택) | (선택) | `backend/app/main.py:23` |
-| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `DEEPL_API_KEY` / `SS_API_KEY` | — | ✓ (기능별) | `render.yaml`, `.env.example` |
+| `GEMINI_API_KEY` / `DEEPL_API_KEY` / `SS_API_KEY` | — | ✓ (기능별) | `render.yaml`, `.env.example` |
 
 **핵심 인증 3종**: `NEXTAUTH_SECRET`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`. 이 3개만 맞아도 로그인 → 검색 호출 200까지 성공합니다.
 
