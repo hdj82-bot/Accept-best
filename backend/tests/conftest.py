@@ -6,14 +6,20 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from jose import jwt
 from sqlalchemy import text
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.main import app
 from app.models.database import Base, get_db
 
-# 테스트 DB URL
-TEST_DATABASE_URL = settings.DATABASE_URL.replace("/academi", "/academi_test")
+# 테스트 DB URL — CI는 이미 _test suffix를 붙여 주입하므로 그대로 사용,
+# 로컬 .env가 운영 DB명인 경우만 _test를 붙여 분리.
+# string replace 대신 sqlalchemy URL 파싱으로 username/host와 무관하게 db명만 변경.
+_url = make_url(settings.DATABASE_URL)
+if _url.database and not _url.database.endswith("_test"):
+    _url = _url.set(database=f"{_url.database}_test")
+TEST_DATABASE_URL = _url.render_as_string(hide_password=False)
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
