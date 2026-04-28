@@ -44,27 +44,48 @@ async def _engine():
 
 @pytest_asyncio.fixture(loop_scope="session")
 async def db_session(_engine) -> AsyncSession:
-    # 매 테스트마다 새 connection + transaction. 종료 시 rollback으로 격리.
+    # 매 테스트마다 새 connection + outer transaction.
+    # join_transaction_mode="create_savepoint": session.commit()이 외부 transaction을
+    # 끝내지 않고 SAVEPOINT만 release. 일부 service가 raw SQL + commit을 직접 호출하지만
+    # outer transaction은 유지되어 다른 service 호출에서도 같은 데이터가 보임.
+    # 종료 시 outer rollback으로 모든 변경 격리.
     async with _engine.connect() as connection:
         transaction = await connection.begin()
-        session = AsyncSession(bind=connection, expire_on_commit=False)
+        session = AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
         try:
             yield session
         finally:
             await session.close()
-            await transaction.rollback()
+            if transaction.is_active:
+                await transaction.rollback()
 
 
 @pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session: AsyncSession):
+    # paper_service 등 일부 서비스는 FastAPI dependency가 아니라 모듈 안에서 직접
+    # `async for db in get_db(): ...` 형태로 새 session을 만든다. 이 패턴은 FastAPI의
+    # dependency_overrides를 우회하므로 테스트 fixture session과 격리되어 seed된 데이터를
+    # 못 본다. 모듈의 get_db symbol을 conftest의 db_session yield로 monkey patch하여
+    # 같은 outer transaction 안에서 동작하게 만든다.
+    import app.services.paper_service as paper_service_mod
+
     async def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-    app.dependency_overrides.clear()
+    _original_paper_service_get_db = paper_service_mod.get_db
+    paper_service_mod.get_db = override_get_db
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+    finally:
+        paper_service_mod.get_db = _original_paper_service_get_db
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
