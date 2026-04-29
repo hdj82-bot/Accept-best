@@ -37,7 +37,9 @@
 | `DATABASE_URL` | — | ✓ | `backend/app/core/config.py:22` |
 | `REDIS_URL` | — | ✓ | `backend/app/core/config.py:23` |
 | `SENTRY_DSN` | (선택) | (선택) | `backend/app/main.py:23` |
-| `GEMINI_API_KEY` / `DEEPL_API_KEY` / `SS_API_KEY` | — | ✓ (기능별) | `render.yaml`, `.env.example` |
+| `GEMINI_API_KEY` | — | ✓ | `render.yaml`, `.env.example` |
+| `SS_API_KEY` | — | ✓ (논문 수집) | `render.yaml`, `.env.example` |
+| `DEEPL_API_KEY` | — | ✓ (번역 기능) | `render.yaml`, `.env.example` |
 
 **핵심 인증 3종**: `NEXTAUTH_SECRET`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`. 이 3개만 맞아도 로그인 → 검색 호출 200까지 성공합니다.
 
@@ -130,7 +132,23 @@ curl -sS -D - -o /dev/null -X OPTIONS \
 
 ---
 
-### 2.4 즉시 조치 절차 (이 문서의 자동 검증으로 확인된 이슈)
+### 2.4 `SS_API_KEY` / `DEEPL_API_KEY` — Render만 (기능별)
+
+**왜 중요**: `render.yaml`에 키 선언만 있고 (`sync: false`) 값은 Render Dashboard에서 직접 입력해야 함. 누락 시 해당 기능 호출 시점에 KeyError 또는 외부 API 인증 실패.
+
+- `SS_API_KEY` (Semantic Scholar) — 논문 수집 파이프라인 핵심. 미설정 시 SS 경로 수집 전체 실패.
+- `DEEPL_API_KEY` — 번역 기능. 미설정 시 번역 호출 실패. 번역 기능을 베타에서 제외했다면 미등록 OK.
+
+**Render 확인 (대시보드)**:
+1. https://dashboard.render.com → academi-ai 서비스 → **Environment**
+2. `SS_API_KEY`, `DEEPL_API_KEY` 행이 존재하는지 확인
+3. reveal → 값이 비어있지 않은지만 확인 (키 형식 검증은 외부 API 호출 시점에 자동)
+
+**점검 빈도**: 한 번 점검하면 끝. 키 로테이션 시에만 재점검.
+
+---
+
+### 2.5 즉시 조치 절차 (이 문서의 자동 검증으로 확인된 이슈)
 
 ```
 Render Dashboard → academi-ai → Environment → CORS_ORIGINS
