@@ -47,7 +47,7 @@ async def share_paper(paper_id: str):
         authors=paper.author_ids or [],
         keywords=paper.keywords or [],
         published_at=paper.published_at,
-        share_url=f"/share/paper/{paper_id}",
+        share_url=f"/api/share/paper/{paper_id}",
     )
 
 
@@ -67,5 +67,5 @@ async def share_diagnosis(diagnosis_id: str):
         overall_score=diagnosis.overall_score,
         section_scores=diagnosis.section_scores,
         created_at=diagnosis.created_at,
-        share_url=f"/share/diagnosis/{diagnosis_id}",
+        share_url=f"/api/share/diagnosis/{diagnosis_id}",
     )
