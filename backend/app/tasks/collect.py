@@ -5,13 +5,13 @@ arXiv API와 Semantic Scholar API에서 논문을 검색하고 DB에 저장한�
 import asyncio
 import logging
 import time
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 import httpx
 
 from app.core.config import settings
 from app.core.exceptions import ExternalAPIError, RateLimitError
+from app.services.arxiv_parser import parse_arxiv_xml
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -53,56 +53,9 @@ async def _fetch_arxiv(keyword: str, max_results: int = 10) -> list[dict]:
         if resp.status_code != 200:
             raise ExternalAPIError("arXiv", f"status {resp.status_code}")
 
-    ns = {"atom": "http://www.w3.org/2005/Atom"}
-    root = ET.fromstring(resp.text)
-    papers = []
-
-    for entry in root.findall("atom:entry", ns):
-        arxiv_id = (entry.findtext("atom:id", "", ns) or "").split("/abs/")[-1]
-        if not arxiv_id:
-            continue
-
-        title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
-        abstract = (entry.findtext("atom:summary", "", ns) or "").strip().replace("\n", " ")
-
-        authors = [
-            a.findtext("atom:name", "", ns)
-            for a in entry.findall("atom:author", ns)
-        ]
-
-        published_str = entry.findtext("atom:published", "", ns) or ""
-        published_at = None
-        if published_str:
-            try:
-                published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
-            except ValueError:
-                pass
-
-        pdf_url = None
-        for link in entry.findall("atom:link", ns):
-            if link.get("title") == "pdf":
-                pdf_url = link.get("href")
-                break
-
-        categories = [
-            c.get("term", "")
-            for c in entry.findall("atom:category", ns)
-            if c.get("term")
-        ]
-
-        papers.append({
-            "title": title,
-            "abstract": abstract,
-            "author_ids": authors,
-            "keywords": categories,
-            "source": "arxiv",
-            "source_id": arxiv_id,
-            "pdf_url": pdf_url,
-            "published_at": published_at,
-        })
-
+    papers = parse_arxiv_xml(resp.text)
+    for _ in papers:
         time.sleep(3)  # rate limit 준수
-
     return papers
 
 
