@@ -6,6 +6,7 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: bash start.sh
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -14,6 +15,10 @@ services:
       - key: NEXTAUTH_SECRET
         sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: SS_API_KEY
+        sync: false
+      - key: DEEPL_API_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false

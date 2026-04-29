@@ -43,6 +43,7 @@
 - `collect` 큐: arXiv·SS API 수집 (느림, sleep(3) 필수)
 - `process` 큐: Claude API 요약·임베딩·설문 (빠름, 사용자 대기)
 - Docker Compose에서 워커 2개 항상 분리 실행
+- **베타 단계 (Render)**: Celery 비활성 (`CELERY_DISABLED=1`), 모든 처리 동기 실행. Render worker 서비스 비용($14/월) 회피 목적. 베타 트래픽 데이터 확인 후 재평가.
 
 ---
 
