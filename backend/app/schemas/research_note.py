@@ -5,16 +5,19 @@ from pydantic import BaseModel, Field
 
 
 class NoteCreate(BaseModel):
+    title: str | None = None
     content: str = Field(..., min_length=1)
 
 
 class NoteUpdate(BaseModel):
-    content: str = Field(..., min_length=1)
+    title: str | None = None
+    content: str | None = Field(default=None, min_length=1)
 
 
 class NoteRead(BaseModel):
     id: str
     user_id: str
+    title: str | None = None
     content: str
     created_at: datetime | None = None
 
