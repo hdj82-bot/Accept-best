@@ -112,6 +112,7 @@ async def test_pre_api_error_propagates():
 async def test_final_uses_final_prompt_and_saves():
     client = _patched_client(return_value=_mock_response(FINAL_VALID))
     db = AsyncMock()
+    db.add = MagicMock()
 
     with patch("app.services.survey_service.get_gemini_client", return_value=client):
         saved = await generate_survey_questions(
@@ -135,6 +136,7 @@ async def test_final_uses_final_prompt_and_saves():
 async def test_final_with_user_answers_injects_context_and_persists_answer():
     client = _patched_client(return_value=_mock_response(FINAL_VALID))
     db = AsyncMock()
+    db.add = MagicMock()
 
     user_answers = {
         "이 변수를 측정하실 때 가장 우선시하는 차원이 무엇인가요?": "결정 자율성",
