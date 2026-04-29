@@ -256,9 +256,11 @@ async def test_get_survey_success(client: AsyncClient, auth_headers: dict):
         def __init__(self):
             self.id = survey_id
             self.paper_id = str(uuid.uuid4())
-            self.question_text = "연구 방법론에 대해 어떻게 생각하십니까?"
-            self.question_type = "likert"
-            self.options = ["매우 동의", "동의", "보통", "비동의", "매우 비동의"]
+            self.original_q = "연구 방법론에 대해 어떻게 생각하십니까?"
+            self.adapted_q = "본 연구의 방법론에 대해 어떻게 평가하시나요?"
+            self.source_title = None
+            self.source_page = None
+            self.year = None
             self.created_at = "2026-04-07T00:00:00Z"
 
     with patch(
@@ -273,4 +275,4 @@ async def test_get_survey_success(client: AsyncClient, auth_headers: dict):
     assert resp.status_code == 200
     data = resp.json()
     assert data["id"] == survey_id
-    assert data["question_text"] == "연구 방법론에 대해 어떻게 생각하십니까?"
+    assert data["original_q"] == "연구 방법론에 대해 어떻게 생각하십니까?"

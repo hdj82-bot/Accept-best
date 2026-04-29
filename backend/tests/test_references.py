@@ -19,12 +19,15 @@ def make_token(user_id: str) -> str:
 class FakeReference:
     def __init__(self, *, ref_id=None):
         self.id = ref_id or str(uuid.uuid4())
+        self.user_id = str(uuid.uuid4())
         self.paper_id = str(uuid.uuid4())
         self.title = "Attention Is All You Need"
-        self.authors = ["Vaswani, A."]
+        self.authors = "Vaswani, A."
         self.year = 2017
         self.journal = "NeurIPS"
         self.doi = "10.48550/arXiv.1706.03762"
+        self.citation_text = None
+        self.memo = None
         self.created_at = "2026-04-07T00:00:00Z"
 
 
