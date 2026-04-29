@@ -4,12 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.models.database import get_db
 from app.schemas.diagnosis import (
+    DialogAnswerRead,
     DiagnoseRequest,
     DiagnoseResponse,
+    DiagnosisAnswerRequest,
     DiagnosisListResponse,
     DiagnosisRead,
 )
 from app.services.diagnosis_service import get_diagnosis, list_diagnoses
+from app.services.dialog_log import log_dialog_answer
 from app.services.paper_service import get_paper
 from app.services.usage import check_quota, increment_usage
 from app.services.user_service import get_user
@@ -53,7 +56,31 @@ async def run_diagnosis(
     return DiagnoseResponse(
         task_id=task_id,
         message="논문 건강검진 태스크가 시작되었습니다.",
+        paper_id=req.paper_id,
     )
+
+
+@router.post("/answer", response_model=DialogAnswerRead)
+async def submit_diagnosis_answer(
+    req: DiagnosisAnswerRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """건강검진 결과의 되묻기 질문에 대한 연구자 답변을 누적 저장한다.
+
+    소크라테스식 대화 정책 (academi.md "대화 정책") 의 데이터 활용 단계.
+    저장된 답변은 (1) 본인의 다음 진단 컨텍스트, (2) 익명·집계 패턴 분석에 사용.
+    """
+    entry = await log_dialog_answer(
+        user_id=user_id,
+        service_name="diagnosis",
+        context_id=req.context_id,
+        question=req.question,
+        answer=req.answer,
+        db=db,
+    )
+    await db.commit()
+    return DialogAnswerRead.model_validate(entry, from_attributes=True)
 
 
 @router.get("", response_model=DiagnosisListResponse)
