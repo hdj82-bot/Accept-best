@@ -10,6 +10,7 @@ from app.schemas.paper import (
     PaperSearchRequest,
     PaperSearchResponse,
 )
+from app.services.arxiv_parser import parse_arxiv_xml
 from app.services.paper_service import get_paper, list_papers, save_paper
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,6 @@ ARXIV_API_URL = "https://export.arxiv.org/api/query"
 
 async def _collect_from_arxiv(keyword: str, max_results: int = 10) -> int:
     """arXiv에서 논문을 검색하여 DB에 저장한다. 저장 건수 반환."""
-    import xml.etree.ElementTree as ET
-    from datetime import datetime
-
     params = {
         "search_query": f"all:{keyword}",
         "start": 0,
@@ -38,56 +36,10 @@ async def _collect_from_arxiv(keyword: str, max_results: int = 10) -> int:
             logger.error("arXiv API error: status %d", resp.status_code)
             return 0
 
-    ns = {"atom": "http://www.w3.org/2005/Atom"}
-    root = ET.fromstring(resp.text)
-    count = 0
-
-    for entry in root.findall("atom:entry", ns):
-        arxiv_id = (entry.findtext("atom:id", "", ns) or "").split("/abs/")[-1]
-        if not arxiv_id:
-            continue
-
-        title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
-        abstract = (entry.findtext("atom:summary", "", ns) or "").strip().replace("\n", " ")
-
-        authors = [
-            a.findtext("atom:name", "", ns)
-            for a in entry.findall("atom:author", ns)
-        ]
-
-        published_str = entry.findtext("atom:published", "", ns) or ""
-        published_at = None
-        if published_str:
-            try:
-                published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
-            except ValueError:
-                pass
-
-        pdf_url = None
-        for link in entry.findall("atom:link", ns):
-            if link.get("title") == "pdf":
-                pdf_url = link.get("href")
-                break
-
-        categories = [
-            c.get("term", "")
-            for c in entry.findall("atom:category", ns)
-            if c.get("term")
-        ]
-
-        await save_paper(
-            title=title,
-            abstract=abstract,
-            author_ids=authors,
-            keywords=categories,
-            source="arxiv",
-            source_id=arxiv_id,
-            pdf_url=pdf_url,
-            published_at=published_at,
-        )
-        count += 1
-
-    return count
+    papers = parse_arxiv_xml(resp.text)
+    for p in papers:
+        await save_paper(**p)
+    return len(papers)
 
 
 @router.get("/search")
