@@ -133,10 +133,9 @@ async def test_result_celery_unavailable_returns_pending(
     client: AsyncClient, auth_headers: dict,
 ):
     """Celery 미연결 시 pending을 반환한다."""
-    with patch(
-        "app.tasks.celery_app",
-        side_effect=Exception("connection refused"),
-    ):
+    mock_celery = MagicMock()
+    mock_celery.AsyncResult.side_effect = Exception("connection refused")
+    with patch("app.tasks.celery_app", mock_celery):
         resp = await client.get(
             f"/api/research-gaps/result/{uuid.uuid4()}", headers=auth_headers,
         )
