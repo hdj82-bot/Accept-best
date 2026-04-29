@@ -6,14 +6,16 @@ from app.models.database import get_db
 from app.schemas.research_note import (
     NoteCreate,
     NoteListResponse,
+    NoteRead,
+    NoteToDraftQuestionsResponse,
     NoteToDraftRequest,
     NoteToDraftResponse,
-    NoteRead,
     NoteUpdate,
 )
 from app.services.research_note_service import (
     create_note,
     delete_note,
+    generate_pre_questions,
     get_note,
     list_notes,
     update_note,
@@ -86,40 +88,48 @@ async def remove_note(
     return {"message": "삭제되었습니다"}
 
 
-@router.post("/to-draft", response_model=NoteToDraftResponse)
+@router.post("/to-draft")
 async def note_to_draft(
     req: NoteToDraftRequest,
+    stage: str = Query(default="draft", regex="^(questions|draft)$"),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """연구 노트를 초안으로 변환하는 태스크를 트리거한다."""
-    # 노트 존재 확인
+    """연구 노트를 초안으로 변환한다.
+
+    소크라테스식 대화 정책 (academi.md "대화 정책"):
+    - stage=questions: AI가 사전 질문 3~5개를 반환. 사용자는 답변 후 stage=draft 재호출.
+    - stage=draft + user_answers: 답변을 컨텍스트로 받아 맞춤 초안 생성.
+    - stage=draft + user_answers 없음: 일반 초안 생성 (정책상 답변은 선택).
+    """
     note = await get_note(req.note_id)
     if note is None:
         raise HTTPException(status_code=404, detail="Note not found")
 
-    # 사용량 체크
+    if stage == "questions":
+        questions = await generate_pre_questions(req.note_id, user_id, db)
+        return NoteToDraftQuestionsResponse(note_id=req.note_id, questions=questions)
+
     user = await get_user(user_id)
     plan = user.plan if user else "free"
     await check_quota(user_id, "research_count", plan, db)
 
-    # Celery 태스크 제출
     try:
         from app.tasks import celery_app
 
         task = celery_app.send_task(
             "app.tasks.process.note_to_draft",
-            args=[user_id, req.note_id],
+            args=[user_id, req.note_id, req.user_answers],
             queue="process",
         )
         task_id = task.id
     except Exception:
         task_id = "sync-execution"
 
-    # 사용량 증가
     await increment_usage(user_id, "research_count", db)
 
     return NoteToDraftResponse(
         task_id=task_id,
         message="노트 → 초안 변환 태스크가 시작되었습니다.",
+        note_id=req.note_id,
     )

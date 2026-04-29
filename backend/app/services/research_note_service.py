@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from sqlalchemy import func, select
@@ -32,6 +33,25 @@ DRAFT_SYSTEM_PROMPT = """당신은 학술 논문 작성 전문가입니다.
 - 학술적 문체 사용
 - 각 섹션에 적절한 분량 배분
 - Markdown 형식으로 작성"""
+
+PRE_QUESTIONS_SYSTEM_PROMPT = """당신은 학술 논문 작성을 돕는 전문가입니다.
+연구자가 제출한 연구 노트를 받았습니다. 노트를 곧바로 초안으로 변환하기 전에,
+연구자가 의도하는 방향을 정확히 반영하기 위해 **3~5개의 사전 질문**을 만들어주세요.
+
+응답 원칙 (academi.md "대화 정책"):
+- 단정형으로 결론을 제시하지 마세요. 연구자에게 되묻는 질문 형태로 작성합니다.
+- 단정형 X / 질문형 O 예시:
+  X: "이 노트의 공통 주장은 디지털 격차 해소입니다."
+  O: "이 노트들의 공통 주장을 한 줄로 요약하신다면 어떤 문장이 되시겠어요?"
+  O: "초안의 독자(IRB 심사자/학회/저널)는 누구를 가정하고 계세요?"
+
+질문 작성 가이드:
+- 연구자만 알 수 있는 맥락(독자 가정·연구 단계·방법론 선호 등)을 묻습니다.
+- 추상적·일반적 질문이 아니라 노트 내용에 근거한 구체 질문을 우선합니다.
+- JSON 배열만 반환하세요. 다른 텍스트는 포함하지 마세요.
+
+응답 형식:
+["질문 1", "질문 2", "질문 3"]"""
 
 
 async def create_note(
@@ -119,12 +139,12 @@ async def get_note(
     return result.scalar_one_or_none()
 
 
-async def convert_note_to_draft(
+async def generate_pre_questions(
     note_id: str,
     user_id: str,
     db: AsyncSession,
-) -> str:
-    """연구 노트를 Gemini API로 학술 논문 초안으로 변환하고 auto 버전으로 저장한다."""
+) -> list[str]:
+    """초안 변환 전 연구자에게 던질 사전 질문 3~5개를 생성한다."""
     note = await get_note(note_id, user_id, db)
     if note is None:
         raise ValueError("Note not found")
@@ -135,6 +155,55 @@ async def convert_note_to_draft(
         response = await client.aio.models.generate_content(
             model=MODEL,
             contents=note.content,
+            config={
+                "system_instruction": PRE_QUESTIONS_SYSTEM_PROMPT,
+                "max_output_tokens": 1024,
+            },
+        )
+    except Exception as e:
+        raise ExternalAPIError("Gemini", str(e))
+
+    try:
+        questions = json.loads(response.text)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ExternalAPIError("Gemini", f"Invalid response format: {e}")
+
+    if not isinstance(questions, list):
+        raise ExternalAPIError("Gemini", "Expected JSON array of questions")
+
+    return [str(q) for q in questions]
+
+
+async def convert_note_to_draft(
+    note_id: str,
+    user_id: str,
+    db: AsyncSession,
+    user_answers: dict[str, str] | None = None,
+) -> str:
+    """연구 노트를 Gemini API로 학술 논문 초안으로 변환하고 auto 버전으로 저장한다.
+
+    user_answers가 제공되면 사전 질문에 대한 연구자 답변을 컨텍스트로 주입.
+    None이거나 빈 dict면 일반 초안 생성으로 fallback (정책상 답변은 선택).
+    """
+    note = await get_note(note_id, user_id, db)
+    if note is None:
+        raise ValueError("Note not found")
+
+    client = get_gemini_client()
+
+    if user_answers:
+        answers_text = "\n".join(f"Q: {q}\nA: {a}" for q, a in user_answers.items())
+        contents = (
+            f"{note.content}\n\n---\n[연구자 사전 답변]\n{answers_text}\n\n"
+            "위 답변에 담긴 의도를 반영해 초안을 작성하세요."
+        )
+    else:
+        contents = note.content
+
+    try:
+        response = await client.aio.models.generate_content(
+            model=MODEL,
+            contents=contents,
             config={"system_instruction": DRAFT_SYSTEM_PROMPT, "max_output_tokens": 4096},
         )
     except Exception as e:

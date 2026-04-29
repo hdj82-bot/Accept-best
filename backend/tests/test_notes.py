@@ -263,5 +263,87 @@ async def test_to_draft_success(
     data = resp.json()
     assert "task_id" in data
     assert "message" in data
+    assert data["stage"] == "draft"
     mock_quota.assert_called_once()
     mock_incr.assert_called_once()
+
+
+# ──────────────────────────────────────────────
+# POST /notes/to-draft?stage=questions — 소크라테스식 사전 질문
+# ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_to_draft_questions_stage_returns_questions(
+    client: AsyncClient, auth_headers: dict
+):
+    """stage=questions: 사전 질문 3~5개를 반환. 사용량 카운트 안 함."""
+    fake = FakeNote()
+    fake_questions = [
+        "이 노트들의 공통 주장을 한 줄로 요약하신다면 어떤 문장이 되시겠어요?",
+        "초안의 독자(IRB 심사자/학회/저널)는 누구를 가정하고 계세요?",
+        "본 연구의 가장 시급한 검증 지점은 무엇이라고 보시나요?",
+    ]
+    with patch("app.api.research_notes.get_note", new_callable=AsyncMock, return_value=fake), \
+         patch(
+             "app.api.research_notes.generate_pre_questions",
+             new_callable=AsyncMock,
+             return_value=fake_questions,
+         ), \
+         patch("app.api.research_notes.check_quota", new_callable=AsyncMock) as mock_quota, \
+         patch("app.api.research_notes.increment_usage", new_callable=AsyncMock) as mock_incr:
+        resp = await client.post(
+            "/api/notes/to-draft?stage=questions",
+            json={"note_id": fake.id},
+            headers=auth_headers,
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["stage"] == "questions"
+    assert data["note_id"] == fake.id
+    assert data["questions"] == fake_questions
+    mock_quota.assert_not_called()
+    mock_incr.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_to_draft_questions_stage_note_not_found(
+    client: AsyncClient, auth_headers: dict
+):
+    with patch("app.api.research_notes.get_note", new_callable=AsyncMock, return_value=None):
+        resp = await client.post(
+            "/api/notes/to-draft?stage=questions",
+            json={"note_id": str(uuid.uuid4())},
+            headers=auth_headers,
+        )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_to_draft_with_user_answers_passed_to_task(
+    client: AsyncClient, db_session: AsyncSession,
+):
+    """stage=draft + user_answers: 답변이 task args에 전달됨."""
+    user_id = str(uuid.uuid4())
+    user = User(id=user_id, email=f"{user_id[:8]}@test.com", plan="free")
+    db_session.add(user)
+    await db_session.flush()
+
+    fake = FakeNote()
+    token = make_token(user_id)
+    answers = {"독자는?": "IRB 심사자", "공통 주장?": "디지털 격차 해소"}
+
+    with patch("app.api.research_notes.get_note", new_callable=AsyncMock, return_value=fake), \
+         patch("app.api.research_notes.get_user", new_callable=AsyncMock, return_value=user), \
+         patch("app.api.research_notes.check_quota", new_callable=AsyncMock), \
+         patch("app.api.research_notes.increment_usage", new_callable=AsyncMock):
+        resp = await client.post(
+            "/api/notes/to-draft",
+            json={"note_id": fake.id, "user_answers": answers},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json()["stage"] == "draft"
