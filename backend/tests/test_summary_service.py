@@ -30,6 +30,10 @@ VALID_RESPONSE = {
     "key_findings": ["셀프 어텐션 메커니즘", "병렬 처리 가능"],
     "methodology": "인코더-디코더 구조",
     "limitations": "긴 시퀀스 처리 비용이 큼",
+    "follow_up_questions": [
+        "이 논문에서 가장 활용 가치 있는 부분이 어떤 곳인가요?",
+        "현재 진행 중인 연구의 어느 단계에서 이 논문을 참고하실 계획인가요?",
+    ],
 }
 
 
@@ -51,6 +55,30 @@ async def test_summarize_returns_summary_read():
     assert result.summary_ko == VALID_RESPONSE["summary_ko"]
     assert len(result.key_findings) == 2
     assert result.methodology == VALID_RESPONSE["methodology"]
+
+
+@pytest.mark.asyncio
+async def test_summarize_includes_follow_up_questions():
+    """소크라테스식 대화 정책: 응답에 후속 질문 포함."""
+    client = _patched_client(return_value=_mock_gemini_response(VALID_RESPONSE))
+
+    with patch("app.services.summary_service.get_gemini_client", return_value=client):
+        result = await summarize_paper("p-1", "Title", "Abstract")
+
+    assert len(result.follow_up_questions) == 2
+    assert "활용 가치" in result.follow_up_questions[0]
+
+
+@pytest.mark.asyncio
+async def test_summarize_missing_follow_up_questions_defaults_empty():
+    """follow_up_questions 누락 시 빈 리스트로 fallback (정책상 후속 질문은 권장이지만 응답이 누락돼도 깨지지 않게)."""
+    response_without_questions = {k: v for k, v in VALID_RESPONSE.items() if k != "follow_up_questions"}
+    client = _patched_client(return_value=_mock_gemini_response(response_without_questions))
+
+    with patch("app.services.summary_service.get_gemini_client", return_value=client):
+        result = await summarize_paper("p-1", "Title", "Abstract")
+
+    assert result.follow_up_questions == []
 
 
 @pytest.mark.asyncio

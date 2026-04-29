@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SummaryRead(BaseModel):
@@ -8,3 +8,4 @@ class SummaryRead(BaseModel):
     key_findings: list[str]
     methodology: str
     limitations: str
+    follow_up_questions: list[str] = Field(default_factory=list)

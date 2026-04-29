@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,9 +28,17 @@ class NoteListResponse(BaseModel):
 
 class NoteToDraftRequest(BaseModel):
     note_id: str = Field(..., min_length=1)
+    user_answers: dict[str, str] | None = None
+
+
+class NoteToDraftQuestionsResponse(BaseModel):
+    stage: Literal["questions"] = "questions"
+    note_id: str
+    questions: list[str]
 
 
 class NoteToDraftResponse(BaseModel):
+    stage: Literal["draft"] = "draft"
     task_id: str
     message: str
     note_id: str
