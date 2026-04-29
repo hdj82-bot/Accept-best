@@ -210,3 +210,25 @@ async def increment_usage(user_id: str, field: str, db: AsyncSession):
 - [x] Sprint 5: 논문 버전 관리 + AI 연구 노트
 - [x] Sprint 6: 참고문헌 + 연구 공백 발견
 - [x] Sprint 7: 베타 배포 ← **완료**
+
+---
+
+## 베타 운영 단계
+
+- **시작일**: 2026-04-29
+- **현재 상태**: Sprint 7 베타 배포 직후, 안정화·관찰 단계
+- **일일 모니터링 루틴**: [.github/BETA_OPS_DAILY.md](.github/BETA_OPS_DAILY.md) — 매일 5분
+- **다음 작업 후보**: [.github/NEXT_TASKS.md](.github/NEXT_TASKS.md) — 졸업 후 Phase 2 착수
+
+### 졸업 기준 (모두 충족 시 Phase 2 착수)
+
+- 7일 연속 무사고 (`/health` 200, Sentry critical 0건)
+- 활성 가입자 누적 30명 (목표값, 베타 데이터로 재조정 가능)
+- 가입자 중 50% 이상이 핵심 기능(논문 검색 + 설문 생성) 1회 이상 실행
+- Gemini API 사용량이 무료 티어 80% 미만 유지
+
+### 베타 단계 한정 정책
+
+- **Celery 비활성** (`CELERY_DISABLED=1`): 모든 처리 동기 실행. Render worker 비용($14/월) 회피.
+- **카카오 OAuth 미지원**: Google만. Phase 2에서 재검토 ([NEXT_TASKS.md #3](.github/NEXT_TASKS.md)).
+- **e2e 자동화 없음**: 매 배포 후 사람이 [CHECKLIST_ENV_VARS.md §3](.github/CHECKLIST_ENV_VARS.md) 5분 수동 점검.
