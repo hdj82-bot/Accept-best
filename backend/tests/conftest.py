@@ -64,27 +64,41 @@ async def db_session(_engine) -> AsyncSession:
                 await transaction.rollback()
 
 
+# `async for db in get_db(): ...` 형태로 모듈 안에서 직접 session을 만드는 서비스들.
+# 이 패턴은 FastAPI dependency_overrides를 우회하므로 테스트 fixture session과 격리되어
+# seed된 데이터를 못 본다(PR #30 paper_service 케이스 참고). 각 모듈의 get_db symbol을
+# conftest의 db_session yield로 monkey patch하여 같은 outer transaction 안에서 동작하게 한다.
+#
+# user_service / plan_service: 현재 호출처 테스트들이 app.api.<route>.get_user 등을
+# 직접 patch해 우회하지만, 그 mock을 빼는 순간 동일 결함이 노출되므로 선제 등록.
+_GET_DB_PATCH_TARGETS = (
+    "app.services.paper_service",
+    "app.services.user_service",
+    "app.services.plan_service",
+)
+
+
 @pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session: AsyncSession):
-    # paper_service 등 일부 서비스는 FastAPI dependency가 아니라 모듈 안에서 직접
-    # `async for db in get_db(): ...` 형태로 새 session을 만든다. 이 패턴은 FastAPI의
-    # dependency_overrides를 우회하므로 테스트 fixture session과 격리되어 seed된 데이터를
-    # 못 본다. 모듈의 get_db symbol을 conftest의 db_session yield로 monkey patch하여
-    # 같은 outer transaction 안에서 동작하게 만든다.
-    import app.services.paper_service as paper_service_mod
+    import importlib
 
     async def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    _original_paper_service_get_db = paper_service_mod.get_db
-    paper_service_mod.get_db = override_get_db
+
+    patched: list[tuple[object, object]] = []
+    for module_path in _GET_DB_PATCH_TARGETS:
+        mod = importlib.import_module(module_path)
+        patched.append((mod, mod.get_db))
+        mod.get_db = override_get_db
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
     finally:
-        paper_service_mod.get_db = _original_paper_service_get_db
+        for mod, original in patched:
+            mod.get_db = original
         app.dependency_overrides.clear()
 
 
