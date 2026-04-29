@@ -1,7 +1,7 @@
 """add user_dialog_answers + paper_diagnoses.issues_with_questions
 
-Revision ID: 004
-Revises: 003
+Revision ID: 005
+Revises: 004
 Create Date: 2026-04-29
 
 소크라테스식 대화 정책 (academi.md "대화 정책") 적용:
@@ -10,9 +10,9 @@ Create Date: 2026-04-29
 - paper_diagnoses.issues_with_questions: 단정형 recommendations 외에
   되묻기 질문 묶음을 JSONB 로 보관 (nullable, 기존 행은 NULL).
 
-본 마이그레이션은 generic 모델만 만든다. 만약 별도 PR 에서 survey 전용
-user_answers 테이블이 먼저 생성됐다면 머지 시 본 generic 테이블로 통합 하고
-survey 측을 view 로 대체하거나 폐기한다 (rebase 시 충돌 해결 가이드).
+원래 PR #41 에서 revision="004" 로 작성됐으나 PR #40 의 004
+(survey_user_answers) 와 alembic head 가 분기됨. 시간상 먼저 머지된 survey 를
+004 로 유지하고 본 마이그레이션을 005 로 rename 하여 chain 을 직선화한다.
 """
 from typing import Sequence, Union
 
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision: str = "004"
-down_revision: Union[str, None] = "003"
+revision: str = "005"
+down_revision: Union[str, None] = "004"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
