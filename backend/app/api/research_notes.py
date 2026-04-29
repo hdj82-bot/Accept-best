@@ -91,7 +91,7 @@ async def remove_note(
 @router.post("/to-draft")
 async def note_to_draft(
     req: NoteToDraftRequest,
-    stage: str = Query(default="draft", regex="^(questions|draft)$"),
+    stage: str = Query(default="draft", pattern="^(questions|draft)$"),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
