@@ -152,10 +152,12 @@ async def test_get_diagnosis_success(client: AsyncClient, auth_headers: dict):
     class FakeDiagnosis:
         def __init__(self):
             self.id = diagnosis_id
+            self.user_id = "test-user-001"
             self.paper_id = str(uuid.uuid4())
             self.overall_score = 78
-            self.section_scores = {"introduction": 80, "methodology": 75, "results": 82}
-            self.feedback = "전반적으로 양호하나 방법론 보강 필요"
+            self.sections = {"introduction": 80, "methodology": 75, "results": 82}
+            self.recommendations = ["방법론 보강 필요", "참고문헌 추가"]
+            self.issues_with_questions = None
             self.created_at = "2026-04-07T00:00:00Z"
 
     with patch(
