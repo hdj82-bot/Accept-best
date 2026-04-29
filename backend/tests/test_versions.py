@@ -15,13 +15,10 @@ def make_token(user_id: str) -> str:
 
 
 class FakeVersion:
-    def __init__(self, *, version_id=None, version_type="manual"):
+    def __init__(self, *, version_id=None, save_type="manual"):
         self.id = version_id or str(uuid.uuid4())
         self.user_id = "test-user-001"
-        # version_type 매개변수는 delete 분기 (paper_versions.py:64) 호환을 위해 유지.
-        # 모델/스키마는 save_type 만 보유하므로 두 속성을 동일 값으로 설정.
-        self.version_type = version_type
-        self.save_type = version_type
+        self.save_type = save_type
         self.content = {"text": "논문 본문 내용"}
         self.created_at = "2026-04-07T00:00:00Z"
 
@@ -147,7 +144,7 @@ async def test_delete_version_not_found(client: AsyncClient, auth_headers: dict)
 @pytest.mark.asyncio
 async def test_delete_auto_version_rejected(client: AsyncClient, auth_headers: dict):
     """auto 타입 버전은 삭제할 수 없다."""
-    fake = FakeVersion(version_type="auto")
+    fake = FakeVersion(save_type="auto")
     with patch(
         "app.api.paper_versions.get_version",
         new_callable=AsyncMock,
@@ -162,7 +159,7 @@ async def test_delete_auto_version_rejected(client: AsyncClient, auth_headers: d
 @pytest.mark.asyncio
 async def test_delete_manual_version_success(client: AsyncClient, auth_headers: dict):
     """manual 타입 버전은 삭제 가능하다."""
-    fake = FakeVersion(version_type="manual")
+    fake = FakeVersion(save_type="manual")
     with patch(
         "app.api.paper_versions.get_version",
         new_callable=AsyncMock,

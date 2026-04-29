@@ -61,7 +61,7 @@ async def remove_version(
     version = await get_version(version_id)
     if version is None:
         raise HTTPException(status_code=404, detail="Version not found")
-    if version.version_type == "auto":
+    if version.save_type == "auto":
         raise HTTPException(status_code=400, detail="자동 저장 버전은 삭제할 수 없습니다")
     await delete_version(version_id)
     return {"message": "삭제되었습니다"}
