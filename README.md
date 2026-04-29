@@ -162,6 +162,8 @@ npm run lint                                      # 프론트
 | 파일 | 대상 | 내용 |
 |---|---|---|
 | **README.md** | 운영자·외부 방문자 | 서비스 소개, 셋업, 배포 |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 베타 사용자(연구자) | 가입 → 검색 → 요약 → 설문 → 다운로드 한 바퀴 투어 |
+| [docs/FAQ.md](docs/FAQ.md) | 베타 사용자(연구자) | 응답 시간·플랜·데이터 보관·로그인·신고 채널 |
 | [academi.md](academi.md) | 개발자·Claude Code | 아키텍처 결정사항, DB 스키마, 코드 패턴 |
 | [CLAUDE.md](CLAUDE.md) | Claude Code 세션 | 모델 정책, Next.js 16 주의사항 |
 | [AGENTS.md](AGENTS.md) | 코딩 에이전트 일반 | 작업 원칙, 우선 읽을 파일 |
