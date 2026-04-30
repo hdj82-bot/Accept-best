@@ -184,7 +184,7 @@ npm run lint                                      # 프론트
 
 ## 기여
 
-1인 개발 단계라 외부 PR은 받고 있지 않지만, 버그·개선 제안은 [Issues](https://github.com/hdj82-bot/academi.ai/issues)로 환영합니다.
+1인 개발 단계라 외부 PR은 받고 있지 않지만, 버그·개선 제안은 [Issues](https://github.com/hdj82-bot/Accept-best/issues)로 환영합니다.
 
 코드 변경 시 원칙:
 
